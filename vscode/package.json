@@ -108,6 +108,21 @@
         "title": "Commit Selected Changes",
         "category": "GitButler",
         "icon": "$(check)"
+      },
+      {
+        "command": "gitbutler.reword",
+        "title": "Rename Commit",
+        "category": "GitButler"
+      },
+      {
+        "command": "gitbutler.uncommit",
+        "title": "Uncommit",
+        "category": "GitButler"
+      },
+      {
+        "command": "gitbutler.uncommitFile",
+        "title": "Uncommit File",
+        "category": "GitButler"
       }
     ],
     "menus": {
@@ -142,6 +157,21 @@
         {
           "command": "gitbutler.commitSelected",
           "when": "view == gitbutlerWorkspace && viewItem == change",
+          "group": "gitbutler@1"
+        },
+        {
+          "command": "gitbutler.reword",
+          "when": "view == gitbutlerWorkspace && viewItem == commit",
+          "group": "gitbutler@1"
+        },
+        {
+          "command": "gitbutler.uncommit",
+          "when": "view == gitbutlerWorkspace && viewItem == commit",
+          "group": "gitbutler@2"
+        },
+        {
+          "command": "gitbutler.uncommitFile",
+          "when": "view == gitbutlerWorkspace && viewItem == commit-file",
           "group": "gitbutler@1"
         }
       ]

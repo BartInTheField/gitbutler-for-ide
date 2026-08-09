@@ -73,7 +73,8 @@ export class GitButlerNode extends vscode.TreeItem {
         public readonly branchName?: string,
         public readonly changeFilePath?: string,
         public readonly commitId?: string,
-        public readonly childrenNodes: GitButlerNode[] = []
+        public readonly childrenNodes: GitButlerNode[] = [],
+        public readonly isCommitFile: boolean = false
     ) {
         super(label, collapsibleState);
 
@@ -85,6 +86,9 @@ export class GitButlerNode extends vscode.TreeItem {
             this.iconPath = new vscode.ThemeIcon('git-commit');
         } else if (nodeType === 'change') {
             this.contextValue = 'change';
+            if (isCommitFile) {
+                this.contextValue = 'commit-file';
+            }
             this.iconPath = new vscode.ThemeIcon('file');
             if (changeFilePath) {
                 const dir = path.dirname(changeFilePath);
@@ -245,7 +249,10 @@ export class GitButlerTreeDataProvider implements vscode.TreeDataProvider<GitBut
                                     vscode.TreeItemCollapsibleState.None,
                                     "change",
                                     undefined,
-                                    change.filePath
+                                    change.filePath,
+                                    commit.commitId,
+                                    [],
+                                    true
                                 )
                             );
                             return new GitButlerNode(
@@ -286,7 +293,10 @@ export class GitButlerTreeDataProvider implements vscode.TreeDataProvider<GitBut
                                 vscode.TreeItemCollapsibleState.None,
                                 "change",
                                 undefined,
-                                change.filePath
+                                change.filePath,
+                                commit.commitId,
+                                [],
+                                true
                             )
                         );
                         return new GitButlerNode(
@@ -654,6 +664,107 @@ export function activate(context: vscode.ExtensionContext) {
             } catch {
                 // Surfaced by callCore or caught
             }
+        })
+    );
+    const allCommits = (s: WorkspaceStatus): Commit[] => [
+        ...(s.branches || []).flatMap((b: Branch) => b.commits || []),
+        ...(s.stacks || []).flatMap((st: Stack) => (st.branches || []).flatMap((b: Branch) => b.commits || []))
+    ];
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('gitbutler.reword', async (node?: GitButlerNode) => {
+            try {
+                const currentCore = treeDataProvider.getCore();
+                if (!currentCore) {
+                    vscode.window.showErrorMessage("GitButler core not initialized");
+                    return;
+                }
+                if (!node?.commitId) {
+                    vscode.window.showErrorMessage("No commit selected");
+                    return;
+                }
+                const status = callCore<WorkspaceStatus>(await currentCore.statusJson());
+                const commit = allCommits(status).find(c => c.commitId === node.commitId);
+                if (!commit) {
+                    vscode.window.showErrorMessage("Could not resolve target commit");
+                    return;
+                }
+                const id = commit.cliId || commit.commitId;
+                const message = await vscode.window.showInputBox({
+                    prompt: "New commit message",
+                    value: commit.message
+                });
+                if (!message || message === commit.message) {
+                    return;
+                }
+                callCore<string>(await currentCore.reword(id, message));
+                vscode.window.showInformationMessage("GitButler: Renamed commit");
+                treeDataProvider.refresh();
+            } catch {}
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('gitbutler.uncommit', async (node?: GitButlerNode) => {
+            try {
+                const currentCore = treeDataProvider.getCore();
+                if (!currentCore) {
+                    vscode.window.showErrorMessage("GitButler core not initialized");
+                    return;
+                }
+                if (!node?.commitId) {
+                    vscode.window.showErrorMessage("No commit selected");
+                    return;
+                }
+                const status = callCore<WorkspaceStatus>(await currentCore.statusJson());
+                const commit = allCommits(status).find(c => c.commitId === node.commitId);
+                if (!commit) {
+                    vscode.window.showErrorMessage("Could not resolve target commit");
+                    return;
+                }
+                const id = commit.cliId || commit.commitId;
+                const confirm = await vscode.window.showWarningMessage(
+                    `Uncommit ${commit.commitId.slice(0, 7)}? Its changes return to your working tree.`,
+                    { modal: true },
+                    'Uncommit'
+                );
+                if (confirm !== 'Uncommit') {
+                    return;
+                }
+                callCore<string>(await currentCore.uncommit(id));
+                vscode.window.showInformationMessage(`GitButler: Uncommitted ${commit.commitId.slice(0, 7)}`);
+                treeDataProvider.refresh();
+            } catch {}
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('gitbutler.uncommitFile', async (node?: GitButlerNode) => {
+            try {
+                const currentCore = treeDataProvider.getCore();
+                if (!currentCore) {
+                    vscode.window.showErrorMessage("GitButler core not initialized");
+                    return;
+                }
+                if (!node?.commitId || !node.changeFilePath) {
+                    vscode.window.showErrorMessage("No committed file selected");
+                    return;
+                }
+                const status = callCore<WorkspaceStatus>(await currentCore.statusJson());
+                const commit = allCommits(status).find(c => c.commitId === node.commitId);
+                if (!commit) {
+                    vscode.window.showErrorMessage("Could not resolve target commit");
+                    return;
+                }
+                const fileChange = (commit.changes || []).find(ch => ch.filePath === node.changeFilePath);
+                if (!fileChange || !fileChange.cliId) {
+                    vscode.window.showErrorMessage("Could not resolve file change");
+                    return;
+                }
+                callCore<string>(await currentCore.uncommit(fileChange.cliId));
+                vscode.window.showInformationMessage(`GitButler: Uncommitted ${node.changeFilePath}`);
+                treeDataProvider.refresh();
+            } catch {}
         })
     );
 }
