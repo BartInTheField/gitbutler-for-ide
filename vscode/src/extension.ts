@@ -453,6 +453,23 @@ async function promptForCommit(status: WorkspaceStatus): Promise<{ branch: strin
     return { branch, message };
 }
 
+interface GitApiChange {
+    uri: vscode.Uri;
+}
+
+interface GitApiRepository {
+    inputBox: { value: string };
+    state: { indexChanges: GitApiChange[]; workingTreeChanges: GitApiChange[] };
+}
+
+interface GitApi {
+    repositories: GitApiRepository[];
+}
+
+interface GitExtensionApi {
+    getAPI(version: number): GitApi;
+}
+
 export function activate(context: vscode.ExtensionContext) {
     const treeDataProvider = new GitButlerTreeDataProvider();
 
@@ -802,6 +819,93 @@ export function activate(context: vscode.ExtensionContext) {
                 await vscode.commands.executeCommand('vscode.diff', left, right, `${path.basename(filePath)} (${parentCommitId.slice(0, 7)})`);
             } else {
                 await vscode.commands.executeCommand('vscode.open', uri);
+            }
+        })
+    );
+
+    const selectedBranchKey = 'gitbutler.selectedVirtualBranch';
+
+    const scmStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+    scmStatusBar.command = 'gitbutler.selectVirtualBranch';
+    context.subscriptions.push(scmStatusBar);
+
+    const updateScmStatusBar = () => {
+        const selected = context.workspaceState.get<string | null>(selectedBranchKey, null);
+        scmStatusBar.text = selected ? `$(git-branch) GitButler: ${selected}` : '$(git-branch) Git: no virtual branch';
+        scmStatusBar.tooltip = selected
+            ? `Source Control commits route to virtual branch '${selected}'. Click to change.`
+            : 'Source Control commits use plain git. Click to route them to a virtual branch.';
+        scmStatusBar.show();
+    };
+    updateScmStatusBar();
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('gitbutler.selectVirtualBranch', async () => {
+            try {
+                const currentCore = treeDataProvider.getCore();
+                if (!currentCore) {
+                    vscode.window.showErrorMessage("GitButler core not initialized");
+                    return;
+                }
+                const status = callCore<WorkspaceStatus>(await currentCore.statusJson());
+                const branchNames = (status.branches || []).map(b => b.name);
+                const noBranch = 'Git: no virtual branch';
+                const picked = await vscode.window.showQuickPick([noBranch, ...branchNames], {
+                    placeHolder: 'Route Source Control commits to a virtual branch'
+                });
+                if (picked === undefined) {
+                    return;
+                }
+                await context.workspaceState.update(selectedBranchKey, picked === noBranch ? null : picked);
+                updateScmStatusBar();
+            } catch {
+                // Surfaced by callCore
+            }
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('gitbutler.commitToVirtualBranch', async () => {
+            const selected = context.workspaceState.get<string | null>(selectedBranchKey, null);
+            if (!selected) {
+                await vscode.commands.executeCommand('git.commit');
+                return;
+            }
+            try {
+                const currentCore = treeDataProvider.getCore();
+                const workspacePath = treeDataProvider.getWorkspacePath();
+                if (!currentCore || !workspacePath) {
+                    vscode.window.showErrorMessage("GitButler core not initialized");
+                    return;
+                }
+                const gitExtension = vscode.extensions.getExtension<GitExtensionApi>('vscode.git');
+                if (gitExtension && !gitExtension.isActive) {
+                    await gitExtension.activate();
+                }
+                const repository = gitExtension?.exports?.getAPI(1)?.repositories?.[0];
+                if (!repository) {
+                    vscode.window.showErrorMessage("No Git repository in the Source Control view");
+                    return;
+                }
+                const message = (repository.inputBox.value || '').trim();
+                if (!message) {
+                    vscode.window.showWarningMessage("Enter a commit message in the Source Control input first.");
+                    return;
+                }
+                const staged = repository.state.indexChanges || [];
+                const working = repository.state.workingTreeChanges || [];
+                const changes = staged.length > 0 ? staged : working;
+                const filePaths = changes.map(c => c.uri.fsPath);
+                if (filePaths.length === 0) {
+                    vscode.window.showWarningMessage("No changes to commit.");
+                    return;
+                }
+                callCore<string>(await currentCore.commit(selected, message, filePaths));
+                repository.inputBox.value = '';
+                vscode.window.showInformationMessage(`GitButler: Committed ${filePaths.length} file(s) to '${selected}'`);
+                treeDataProvider.refresh();
+            } catch {
+                // Surfaced by callCore
             }
         })
     );
