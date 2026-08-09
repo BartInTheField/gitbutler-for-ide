@@ -3,3 +3,4 @@ lockfile = true
 
 [tools]
 java = "corretto-21"
+node = "24"
