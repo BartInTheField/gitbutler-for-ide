@@ -20,6 +20,7 @@ release body.
   them there, or onto a commit to amend them into it (after a confirmation).
 - Added commit history actions with right-click menus: Rename Commit and Uncommit on commit rows, and Uncommit File on a file inside a commit — wired to the shared core's reword/uncommit.
 - Workspace tree rows now show richer labels: the unassigned node shows its change count (`Unassigned changes (N)`), branch rows show push status (`unpushed` / `✓ pushed`), and commit rows are prefixed with the 7-char commit sha.
+- Workspace tree file rows now show the change type as a prefix (e.g. `modified README.md`) and set the row's `resourceUri` so VS Code applies its native source-control color and status badge.
 
 ### Fixes
 
