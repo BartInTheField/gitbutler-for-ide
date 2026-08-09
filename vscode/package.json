@@ -36,7 +36,7 @@
   "scripts": {
     "build:core": "cd .. && ./gradlew :core:jsNodeProductionLibraryDistribution",
     "typecheck": "tsc -p ./ --noEmit",
-    "esbuild": "esbuild src/extension.ts --bundle --platform=node --target=node20 --external:vscode --outfile=out/extension.js",
+    "esbuild": "esbuild src/extension.ts --bundle --platform=node --target=node24 --external:vscode --outfile=out/extension.js",
     "compile": "npm run typecheck && npm run esbuild",
     "build": "npm run build:core && npm install && npm run compile",
     "vscode:prepublish": "npm run esbuild",
