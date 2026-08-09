@@ -32,6 +32,17 @@ Mirrors `but status`:
 | Apply Branch | `gitbutler.apply` | `but apply <branch>` (branch name via input box) |
 | Unapply Branch | `gitbutler.unapply` | `but unapply <branch>` |
 | Commit to virtual branch | `gitbutler.commit` | `but commit -b <branch> -m <message> <ids>` (quick-pick branch + files, input message) |
+| Commit Selected Changes | `gitbutler.commitSelected` | Commits the files currently selected in the tree (`but commit`); prompts for branch + message |
+
+The tree is multi-select: Ctrl/Shift-click (or Cmd-click) several file rows, then right-click
+the selection and choose **Commit Selected Changes** to commit exactly those files.
+
+### Drag and drop
+
+Mirrors the JetBrains plugin: drag one or more uncommitted change rows onto a **branch** to
+commit them to that branch (prompts for a message), or onto a **commit** to amend them into
+it (after a confirmation). `but amend` addresses the target by its GitButler change id, so
+the drop resolves the commit's `cliId` before amending.
 
 Failures surface as VS Code error toasts carrying the CLI's message; the tree refreshes
 after every successful mutation.

@@ -13,6 +13,11 @@ release body.
   changes, stacks, branches, commits and their files) plus Pull Workspace,
   Push, Apply, Unapply and Commit-to-virtual-branch commands, all powered by
   the shared `:core` (Kotlin/JS) package.
+- The workspace tree supports multi-selecting files (Ctrl/Shift/Cmd-click); a new **Commit
+  Selected Changes** right-click action commits exactly the selected files to a chosen
+  virtual branch.
+- Drag-and-drop in the workspace tree: drag uncommitted changes onto a branch to commit
+  them there, or onto a commit to amend them into it (after a confirmation).
 
 ### Fixes
 
