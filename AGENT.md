@@ -1,32 +1,68 @@
-# Agent guide — GitButler for JetBrains IDEs
+# Agent guide — GitButler Monorepo (IntelliJ & VSCode)
 
-Unofficial IntelliJ plugin (Kotlin, JDK 21, IntelliJ Platform Gradle Plugin 2.x, IC 2025.1+) that integrates GitButler virtual branches into the IDE: a branch selector in the commit window and a workspace tool window. All GitButler operations shell out to the `but` CLI (0.22.0+) with `--json`. Active only when the project is on the `gitbutler/workspace` branch.
+Monorepo containing GitButler integrations for JetBrains IDEs (`jetbrains/`) and VSCode (`vscode/`), powered by a shared Kotlin Multiplatform core library (`core/`). All GitButler operations shell out to the `but` CLI (0.22.0+) with `--json`. Active only when the project is on the `gitbutler/workspace` branch.
 
 ## Commands
 
+### Core Library (`core/`)
+
 ```bash
-./gradlew test          # unit + integration tests — run this after every change
-./gradlew buildPlugin   # produces build/distributions/*.zip (NOT `build` — the
-                        # lifecycle `build` task does not produce the zip)
-./gradlew runIde        # sandbox IDE with the plugin installed
+./gradlew :core:allTests                              # unit tests for common, JVM, and JS targets
+./gradlew :core:jsNodeProductionLibraryDistribution   # builds Node-requireable JS package in core/build/dist/js/productionLibrary/
 ```
 
-Gradle needs a JDK 21 (`kotlin { jvmToolchain(21) }`). If there is no system Java, point `JAVA_HOME` at one (e.g. `JAVA_HOME=/opt/homebrew/opt/openjdk@21` on macOS/Homebrew).
+### JetBrains Plugin (`jetbrains/`)
+
+```bash
+./gradlew :jetbrains:test          # unit + CLI integration tests
+./gradlew :jetbrains:buildPlugin   # produces jetbrains/build/distributions/*.zip (NOT `build`)
+./gradlew :jetbrains:runIde        # sandbox IDE with the plugin installed
+```
+
+### VSCode Extension (`vscode/`)
+
+```bash
+./gradlew :core:jsNodeProductionLibraryDistribution   # build JS dependency first
+cd vscode && npm install && npm run compile          # compile VSCode TypeScript extension
+```
+
+Gradle needs JDK 21 (`kotlin { jvmToolchain(21) }`). If there is no system Java, point `JAVA_HOME` at one (e.g. `JAVA_HOME=/opt/homebrew/opt/openjdk@21` on macOS/Homebrew).
+
+---
 
 ## Non-negotiable rules
 
-1. **Every behavior change ships with tests, and you run them** (`./gradlew test`) before declaring done. Pure parsing/mapping logic → unit test; anything touching the real `but` CLI contract → integration test (see below).
+1. **Every behavior change ships with tests, and you run them** (`./gradlew :core:allTests`, `./gradlew :jetbrains:test`) before declaring done. Pure parsing/mapping logic → unit test in `:core`; anything touching the real `but` CLI contract → integration test in `:jetbrains` (see below).
 2. **Every new feature or user-visible change updates `docs/`** — extend the matching page (`docs/virtual-branch-commit.md`, `docs/tool-window.md`) or add a new page for a new surface.
-3. **README.md and the plugin description stay lean.** `README.md` and `<description>` in `src/main/resources/META-INF/plugin.xml` get at most a one-line mention of a new feature; the full explanation lives in `docs/` and the README links to it. Never grow either into a manual.
-4. **Every PR adds a `CHANGELOG.md` entry** under `## Unreleased` in the matching section (Features / Fixes / Internal improvements). CI blocks PRs that don't touch `CHANGELOG.md`.
+3. **README.md and plugin descriptions stay lean.** `README.md` and `<description>` in `jetbrains/src/main/resources/META-INF/plugin.xml` get at most a one-line mention of a new feature; full explanations live in `docs/` and the README links to them. Never grow either into a manual.
+4. **Every PR adds a `CHANGELOG.md` entry** to the appropriate module changelog (`core/CHANGELOG.md`, `jetbrains/CHANGELOG.md`, `vscode/CHANGELOG.md`) under `## Unreleased` in the matching section (Features / Fixes / Internal improvements). CI blocks PRs that don't touch at least one changelog file.
+
+---
+
+## Architecture
+
+- **`core/`** — Kotlin Multiplatform library (JVM + JS targets) containing CLI orchestration, models, parsing, and path mapping.
+  - `commonMain/` — `ButClient`, `ButCommands`, `ButJsonParser`, `ButModel`, `ButPathMapper`, `ButExecutableResolver`, `ButEnvironment`, `PlatformPaths`.
+  - `jvmMain/` — JVM platform paths.
+  - `jsMain/` — `GitButlerCore` (JS export facade), `NodeButEnvironment`, JS platform paths.
+  - `commonTest/`, `jvmTest/` — Unit tests for CLI parsing, path mapping, command construction, and executable resolution.
+- **`jetbrains/`** — IntelliJ Platform plugin consuming `:core` (JVM target).
+  - `core/` — `GitButlerService` (project service).
+  - `commit/` — Commit-window integration (`GitButlerCheckinHandlerFactory`/`GitButlerCheckinHandler`, `GitButlerBranchComboAction`, `GitButlerCommitSelection`).
+  - `toolwindow/` — Workspace tool window (`GitButlerToolWindowFactory`, `GitButlerStatusPanel`, `GitButlerTreeDnDSupport`).
+  - `branchmenu/` — Native Git branch context menu actions (`GitButlerApplyBranchAction`, `GitButlerUnapplyBranchAction`).
+  - `src/test/.../integration/` — Integration tests against real CLI in Docker (`ButStatusIntegrationTest.kt`).
+- **`vscode/`** — VSCode extension (TypeScript/Node) consuming the `:core` Kotlin/JS package (`gitbutler-core`).
+
+---
 
 ## Testing
 
-### Unit tests (`src/test/.../core/`)
+### Unit tests (`core/src/commonTest/`, `core/src/jvmTest/`)
 
-`ButJsonParserTest`, `ButPathMapperTest` — plain JUnit 4 against captured JSON fixtures. Fast, no Docker. Extend these when changing parsing, path mapping, or command construction.
+`ButJsonParserTest`, `ButPathMapperTest`, `ButExecutableResolverTest`, `ButCommandsTest` — plain JUnit tests against captured JSON fixtures. Fast, no Docker. Extend these when changing parsing, path mapping, or command construction.
 
-### Integration tests (`src/test/.../integration/ButStatusIntegrationTest.kt`)
+### Integration tests (`jetbrains/src/test/.../integration/ButStatusIntegrationTest.kt`)
 
 These validate the plugin's CLI contract end-to-end against the **real** GitButler CLI:
 
@@ -34,16 +70,29 @@ These validate the plugin's CLI contract end-to-end against the **real** GitButl
 - Each test creates a **real git repository** inside the container via the `freshRepo(name)` helper (`but setup --init`), makes real file changes and branches, then runs the plugin's **own** `ButCommands` argument lists, feeds the real JSON through `ButJsonParser`/`ButPathMapper`, and asserts on the parsed `WorkspaceStatus` model.
 - Pattern for a new test: `freshRepo` → arrange with `exec(repo, ...)` shell steps → act through `but(repo, ButCommands.xxx(...))` → assert on `status(repo)`. Always go through `ButCommands`, never hand-written arg lists — the point is testing what the plugin actually sends.
 - **Self-skipping:** the whole class skips (never fails) when Docker is unavailable, via a hardened `Assume` in `@BeforeClass`. Keep it that way: construct anything Testcontainers-related lazily in `@BeforeClass`, never in static init (static init throws `java.lang.Error` on Docker-less machines and breaks the skip).
-- Locally under colima, `build.gradle.kts` derives `DOCKER_HOST` from the docker context and disables Ryuk — don't remove that block.
+- Locally under colima, `jetbrains/build.gradle.kts` derives `DOCKER_HOST` from the docker context and disables Ryuk — don't remove that block.
 
 Any change to `ButCommands`, `ButJsonParser`, `ButPathMapper`, or a new `but` subcommand needs a matching integration test that exercises it against the real CLI.
 
-## Architecture
+---
 
-- `core/` — CLI plumbing: `GitButlerService` (project service, finds `but`, runs it), `ButCommands` (argument lists), `ButJsonParser` (JSON → model), `ButModel` (`WorkspaceStatus` etc.), `ButPathMapper` (absolute IDE paths → CLI change ids).
-- `commit/` — commit-window integration: `GitButlerCheckinHandlerFactory`/`GitButlerCheckinHandler` intercept the commit flow, `GitButlerBranchComboAction` is the toolbar selector, `GitButlerCommitSelection` holds the chosen branch per project.
-- `toolwindow/` — `GitButlerToolWindowFactory` + `GitButlerStatusPanel` render `but status -f` as a tree (branches → commits → the files each commit changed), auto-refreshed on `GitRepository.GIT_REPO_CHANGE` (500 ms debounce); `GitButlerTreeDnDSupport` adds drag-and-drop of uncommitted changes onto branches and commits.
-- `src/main/resources/META-INF/plugin.xml` — extension points, tool window, actions, plugin description.
+## CI & Release Policy
+
+- **CI Workflow** (`.github/workflows/ci.yml`):
+  - `changelog`: Gate verifying that PRs add at least one line under `## Unreleased` in `core/CHANGELOG.md`, `jetbrains/CHANGELOG.md`, or `vscode/CHANGELOG.md`.
+  - `core`: Runs `./gradlew :core:allTests`.
+  - `jetbrains`: Runs `./gradlew :jetbrains:test :jetbrains:buildPlugin`.
+  - `vscode`: Runs `./gradlew :core:jsNodeProductionLibraryDistribution` and `cd vscode && npm install && npm run compile`.
+
+- **Release Workflow** (`.github/workflows/release.yml`):
+  - Triggered manually via `workflow_dispatch` on `main`.
+  - Runs full test suite for all modules.
+  - Computes CalVer version (`YYYY.M.D.N`).
+  - Builds IntelliJ plugin ZIP (`:jetbrains:buildPlugin`) and packages VSCode `.vsix` extension (`npx @vscode/vsce package`).
+  - Assembles a single GitHub release body with up to three sections (`## Core`, `## JetBrains`, `## VSCode`) by reading the `## Unreleased` section of each module's `CHANGELOG.md`.
+  - Cuts all three `CHANGELOG.md` files (stamping `## <VERSION> - <DATE>` and resetting `## Unreleased`), commits with `[skip ci]`, and pushes back to `main`.
+
+---
 
 ## Gotchas
 
@@ -51,7 +100,8 @@ Any change to `ButCommands`, `ButJsonParser`, `ButPathMapper`, or a new `but` su
 - Detect Commit-and-Push via `executor.id == "Git.Commit.And.Push.Executor"` — the class `git4idea.checkin.GitCommitAndPushExecutor` is Kotlin-`internal`, don't reference it.
 - The `CheckinHandlerFactory` must always return the real handler (never a dummy): it runs once at commit-UI creation, possibly before git repos register.
 - Branch names in `Presentation.setText` need `setText(text, false)` — `_`/`&` are otherwise eaten as mnemonics.
-- CI is GitHub Actions (`.github/workflows/ci.yml`): a changelog gate plus `./gradlew test buildPlugin` on every PR and push to `main`. The hosted ubuntu runners provide a Docker daemon, so the CLI integration tests actually run there instead of self-skipping. Releases are **not** automatic on merge: run the separate `release.yml` workflow manually on `main` from the Actions tab, which tests, versions (CalVer, stamped via `-PpluginVersion`), builds, creates the GitHub release with the `## Unreleased` section of `CHANGELOG.md` as its body, then commits the changelog cut back to `main`.
+
+---
 
 ## Version control
 

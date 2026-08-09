@@ -1,0 +1,35 @@
+# Changelog
+
+Every PR must add an entry under `## Unreleased` in the matching section
+(Features / Fixes / Internal improvements) — CI blocks PRs that don't touch
+this file. On release, the Unreleased section becomes the VSCode part of the
+release body.
+
+## Unreleased
+
+### Features
+
+- Initial VSCode extension — a GitButler workspace tree view (unassigned
+  changes, stacks, branches, commits and their files) plus Pull Workspace,
+  Push, Apply, Unapply and Commit-to-virtual-branch commands, all powered by
+  the shared `:core` (Kotlin/JS) package.
+
+### Fixes
+
+- GitButler operations (status, pull, push, apply, unapply, commit) run asynchronously,
+  so they never freeze the VS Code window while `but` runs.
+- Commands are grouped under a **GitButler** category, so they surface when you type
+  "GitButler" in the Command Palette (previously only the auto-generated view commands did).
+- Tree file rows no longer duplicate the filename; the containing directory (when any) is
+  shown as the row description instead of the full path.
+
+### Internal improvements
+
+- Added end-to-end tests: a core suite driving the compiled package against the real `but`
+  CLI (host + hermetic Testcontainers modes), and a UI suite that launches the extension in
+  a real editor and screenshots the GitButler view — VSCodium via Playwright's Electron API
+  (default), or Microsoft VS Code via ExTester.
+- Added Marketplace/Open VSX publishing metadata to `package.json` (description,
+  categories, keywords, icon, repository, bugs, homepage, gallery banner) plus an
+  extension `README.md`, `LICENSE` and 128×128 `icon.png`, so `vsce`/`ovsx` package
+  and publish cleanly.

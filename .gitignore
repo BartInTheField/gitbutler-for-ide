@@ -4,3 +4,10 @@ build/
 .DS_Store
 .intellijPlatform/
 .kotlin/
+node_modules/
+vscode/out/
+vscode/*.vsix
+vscode/out-ui/
+vscode/test-resources/
+vscode/.test-extensions/
+vscode/screenshots/

@@ -1,0 +1,154 @@
+{
+  "name": "gitbutler-for-ide",
+  "displayName": "GitButler for IDE",
+  "description": "Work with GitButler virtual branches without leaving your editor: a workspace tree view plus pull, push, apply, unapply and commit-to-virtual-branch commands, powered by the GitButler `but` CLI.",
+  "publisher": "BartInTheField",
+  "version": "0.1.0",
+  "license": "MIT",
+  "icon": "icon.png",
+  "categories": [
+    "SCM Providers"
+  ],
+  "keywords": [
+    "git",
+    "gitbutler",
+    "virtual branches",
+    "scm",
+    "version control"
+  ],
+  "homepage": "https://github.com/BartInTheField/gitbutler-for-ide/tree/main/vscode#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/BartInTheField/gitbutler-for-ide.git",
+    "directory": "vscode"
+  },
+  "bugs": {
+    "url": "https://github.com/BartInTheField/gitbutler-for-ide/issues"
+  },
+  "galleryBanner": {
+    "color": "#74D3D1",
+    "theme": "light"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "main": "./out/extension.js",
+  "scripts": {
+    "build:core": "cd .. && ./gradlew :core:jsNodeProductionLibraryDistribution",
+    "typecheck": "tsc -p ./ --noEmit",
+    "esbuild": "esbuild src/extension.ts --bundle --platform=node --target=node20 --external:vscode --outfile=out/extension.js",
+    "compile": "npm run typecheck && npm run esbuild",
+    "build": "npm run build:core && npm install && npm run compile",
+    "vscode:prepublish": "npm run esbuild",
+    "package": "vsce package --no-dependencies -o gitbutler-for-ide.vsix",
+    "test:e2e": "node --test test/e2e/*.test.cjs",
+    "compile:ui": "tsc -p tsconfig.ui.json",
+    "test:ui": "npm run compile && npm run compile:ui && extest setup-and-run \"out-ui/ui/*.test.js\" --extensions_dir .test-extensions",
+    "test:ui:codium": "npm run compile && npm run compile:ui && node out-ui/ui/codium-smoke.js"
+  },
+  "activationEvents": [
+    "onView:gitbutlerWorkspace",
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "gitbutler",
+          "title": "GitButler",
+          "icon": "resources/gitbutlerToolWindow.svg"
+        }
+      ]
+    },
+    "views": {
+      "gitbutler": [
+        {
+          "id": "gitbutlerWorkspace",
+          "name": "Workspace"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "gitbutler.refresh",
+        "title": "Refresh",
+        "category": "GitButler",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "gitbutler.pull",
+        "title": "Pull Workspace",
+        "category": "GitButler",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "gitbutler.push",
+        "title": "Push Branch",
+        "category": "GitButler",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "gitbutler.apply",
+        "title": "Apply Branch",
+        "category": "GitButler"
+      },
+      {
+        "command": "gitbutler.unapply",
+        "title": "Unapply Branch",
+        "category": "GitButler"
+      },
+      {
+        "command": "gitbutler.commit",
+        "title": "Commit to virtual branch",
+        "category": "GitButler",
+        "icon": "$(check)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "gitbutler.refresh",
+          "when": "view == gitbutlerWorkspace",
+          "group": "navigation@1"
+        },
+        {
+          "command": "gitbutler.pull",
+          "when": "view == gitbutlerWorkspace",
+          "group": "navigation@2"
+        },
+        {
+          "command": "gitbutler.commit",
+          "when": "view == gitbutlerWorkspace",
+          "group": "navigation@3"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "gitbutler.push",
+          "when": "view == gitbutlerWorkspace && viewItem == branch",
+          "group": "inline@1"
+        },
+        {
+          "command": "gitbutler.unapply",
+          "when": "view == gitbutlerWorkspace && viewItem == branch",
+          "group": "inline@2"
+        }
+      ]
+    }
+  },
+  "devDependencies": {
+    "@types/chai": "^4.3.20",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^20.14.0",
+    "@types/vscode": "^1.90.0",
+    "@vscode/vsce": "^2.32.0",
+    "chai": "^4.5.0",
+    "esbuild": "^0.23.1",
+    "gitbutler-core": "file:../core/build/dist/js/productionLibrary",
+    "mocha": "^10.8.2",
+    "playwright-core": "^1.62.1",
+    "testcontainers": "^10.28.0",
+    "typescript": "^5.5.4",
+    "vscode-extension-tester": "^8.24.0"
+  }
+}

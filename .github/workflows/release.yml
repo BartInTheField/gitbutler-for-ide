@@ -11,7 +11,7 @@ permissions:
 jobs:
   # Same gate as the CI workflow: never cut a release from a build that fails.
   test:
-    name: Test and build plugin
+    name: Test monorepo
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,7 +23,13 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - run: ./gradlew test buildPlugin --no-daemon
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - run: ./gradlew :core:allTests :jetbrains:test :jetbrains:buildPlugin :core:jsNodeProductionLibraryDistribution --no-daemon
+
+      - run: cd vscode && npm install && npm run compile
 
   # CalVer with a per-day counter: YYYY.M.D.N where N is 1 for the first release
   # of the day and increments for each further release the same day. The counter
@@ -52,6 +58,10 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       - name: Compute version
         run: |
           Y=$(date -u +%Y)
@@ -65,77 +75,138 @@ jobs:
           echo "$VERSION" > version.txt
           echo "Version for this build: $VERSION"
 
-      - name: Build plugin
-        run: ./gradlew buildPlugin --no-daemon "-PpluginVersion=$(cat version.txt)"
+      - name: Build artifacts
+        run: |
+          VERSION=$(cat version.txt)
+          ./gradlew :jetbrains:buildPlugin "-PpluginVersion=$VERSION" "-PcoreVersion=$VERSION" --no-daemon
+          ./gradlew :core:jsNodeProductionLibraryDistribution "-PcoreVersion=$VERSION" --no-daemon
+          cd vscode
+          npm install
+          # vsce requires a 3-part semver; CalVer is YYYY.M.D.N, so drop the daily
+          # counter for the manifest version. The full CalVer stays in the filename.
+          VSIX_VER=$(echo "$VERSION" | cut -d. -f1-3)
+          npm version --no-git-tag-version --allow-same-version "$VSIX_VER"
+          npm run compile
+          npx @vscode/vsce package --no-dependencies -o "gitbutler-for-ide-$VERSION.vsix"
 
       - name: Create GitHub release
         run: |
           set -e
           VERSION=$(cat version.txt)
-          ZIP=$(ls build/distributions/*-"$VERSION".zip | head -1)
-          # The release body is the '## Unreleased' section of CHANGELOG.md
-          # (everything between '## Unreleased' and the next '## ' heading),
-          # with empty '### ' subsections stripped and blank lines collapsed.
-          NOTES=$(awk '/^## Unreleased$/{flag=1;next} /^## /{flag=0} flag' CHANGELOG.md)
-          NOTES=$(printf '%s\n' "$NOTES" | awk '
-            function flush() {
-              if (heading == "" || has) {
-                if (heading != "") print heading
-                printf "%s", buf
+          ZIP=$(ls jetbrains/build/distributions/*-"$VERSION".zip 2>/dev/null | head -1 || true)
+          if [ -z "$ZIP" ]; then
+            ZIP=$(ls jetbrains/build/distributions/*.zip 2>/dev/null | head -1 || true)
+          fi
+          VSIX="vscode/gitbutler-for-ide-$VERSION.vsix"
+
+          extract_unreleased() {
+            file="$1"
+            notes=$(awk '/^## Unreleased$/{flag=1;next} /^## /{flag=0} flag' "$file")
+            cleaned=$(printf '%s\n' "$notes" | awk '
+              function flush() {
+                if (heading == "" || has) {
+                  if (heading != "") print heading
+                  printf "%s", buf
+                }
+                heading = ""; buf = ""; has = 0
               }
-              heading = ""; buf = ""; has = 0
-            }
-            /^### / { flush(); heading = $0; next }
-            { buf = buf $0 "\n"; if ($0 ~ /[^[:space:]]/) has = 1 }
-            END { flush() }
-          ' | awk '
-            NF { if (started && pending) print ""; print; started = 1; pending = 0; next }
-            { pending = 1 }
-          ')
-          if [ -z "$(printf '%s\n' "$NOTES" | grep -v '^###' | grep -v '^[[:space:]]*$' || true)" ]; then
-            echo "ERROR: the '## Unreleased' section of CHANGELOG.md has no entries."
+              /^### / { flush(); heading = $0; next }
+              { buf = buf $0 "\n"; if ($0 ~ /[^[:space:]]/) has = 1 }
+              END { flush() }
+            ' | awk '
+              NF { if (started && pending) print ""; print; started = 1; pending = 0; next }
+              { pending = 1 }
+            ')
+            echo "$cleaned"
+          }
+
+          CORE_NOTES=$(extract_unreleased core/CHANGELOG.md)
+          JB_NOTES=$(extract_unreleased jetbrains/CHANGELOG.md)
+          VS_NOTES=$(extract_unreleased vscode/CHANGELOG.md)
+
+          rm -f notes.md
+          touch notes.md
+
+          HAS_CONTENT=0
+
+          if [ -n "$(printf '%s\n' "$CORE_NOTES" | grep -v '^###' | grep -v '^[[:space:]]*$' || true)" ]; then
+            echo "## Core" >> notes.md
+            echo "$CORE_NOTES" >> notes.md
+            echo "" >> notes.md
+            HAS_CONTENT=1
+          fi
+
+          if [ -n "$(printf '%s\n' "$JB_NOTES" | grep -v '^###' | grep -v '^[[:space:]]*$' || true)" ]; then
+            echo "## JetBrains" >> notes.md
+            echo "$JB_NOTES" >> notes.md
+            echo "" >> notes.md
+            HAS_CONTENT=1
+          fi
+
+          if [ -n "$(printf '%s\n' "$VS_NOTES" | grep -v '^###' | grep -v '^[[:space:]]*$' || true)" ]; then
+            echo "## VSCode" >> notes.md
+            echo "$VS_NOTES" >> notes.md
+            echo "" >> notes.md
+            HAS_CONTENT=1
+          fi
+
+          if [ "$HAS_CONTENT" -eq 0 ]; then
+            echo "ERROR: '## Unreleased' sections in core/CHANGELOG.md, jetbrains/CHANGELOG.md, and vscode/CHANGELOG.md are all empty."
             echo "Add at least one changelog entry before cutting a release."
             exit 1
           fi
-          echo "Releasing $ZIP as $VERSION"
-          printf '%s\n' "$NOTES" > notes.md
-          # Create the release (attaches the plugin zip as a release asset) and
-          # let GitHub create the tag at this commit.
-          gh release create "$VERSION" "$ZIP" \
+
+          ASSETS=("$ZIP")
+          if [ -f "$VSIX" ]; then
+            ASSETS+=("$VSIX")
+          fi
+
+          echo "Releasing assets: ${ASSETS[*]} as $VERSION"
+
+          gh release create "$VERSION" "${ASSETS[@]}" \
             --target "$GITHUB_SHA" \
             --title "$VERSION" \
             --notes-file notes.md
 
-      # After a release, stamp the released version into CHANGELOG.md: the current
+      # After a release, stamp the released version into each CHANGELOG.md: the current
       # '## Unreleased' heading becomes '## <VERSION> - <date>' and a fresh empty
       # Unreleased scaffold is inserted above it. The commit carries [skip ci] so
       # the push back to main does not trigger another workflow run.
-      - name: Cut changelog for next release
+      - name: Cut changelogs for next release
         run: |
           set -e
           VERSION=$(cat version.txt)
           TODAY=$(date -u +%Y-%m-%d)
-          awk -v ver="$VERSION" -v day="$TODAY" '
-            /^## Unreleased$/ && !done {
-              print "## Unreleased"
-              print ""
-              print "### Features"
-              print ""
-              print "### Fixes"
-              print ""
-              print "### Internal improvements"
-              print ""
-              print "## " ver " - " day
-              done=1
-              next
-            }
-            { print }
-          ' CHANGELOG.md > CHANGELOG.md.new
-          mv CHANGELOG.md.new CHANGELOG.md
+
+          cut_changelog() {
+            file="$1"
+            awk -v ver="$VERSION" -v day="$TODAY" '
+              /^## Unreleased$/ && !done {
+                print "## Unreleased"
+                print ""
+                print "### Features"
+                print ""
+                print "### Fixes"
+                print ""
+                print "### Internal improvements"
+                print ""
+                print "## " ver " - " day
+                done=1
+                next
+              }
+              { print }
+            ' "$file" > "$file.new"
+            mv "$file.new" "$file"
+          }
+
+          cut_changelog core/CHANGELOG.md
+          cut_changelog jetbrains/CHANGELOG.md
+          cut_changelog vscode/CHANGELOG.md
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add CHANGELOG.md
-          git commit -m "chore: cut changelog for $VERSION [skip ci]"
+          git add core/CHANGELOG.md jetbrains/CHANGELOG.md vscode/CHANGELOG.md
+          git commit -m "chore: cut changelogs for $VERSION [skip ci]"
           # Protects against anything having landed on main since the workflow
           # started — replay the single changelog commit onto the current tip.
           git fetch origin main
