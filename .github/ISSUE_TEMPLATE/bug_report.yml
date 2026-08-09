@@ -1,0 +1,85 @@
+name: Bug report
+description: Report a problem with the GitButler core, JetBrains plugin, or VSCode extension.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug. Please fill in enough detail for us to reproduce it.
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which part of the project is affected?
+      options:
+        - VSCode extension
+        - JetBrains plugin
+        - Core library (:core)
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug, including what you expected to happen instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a project on the `gitbutler/workspace` branch
+        2. ...
+        3. See the error
+    validations:
+      required: true
+  - type: input
+    id: but-version
+    attributes:
+      label: GitButler CLI version
+      description: Output of `but --version`.
+      placeholder: "but 0.22.0"
+    validations:
+      required: true
+  - type: input
+    id: host-version
+    attributes:
+      label: Editor / IDE and version
+      description: e.g. IntelliJ IDEA 2025.1.4 (Community), or VS Code / VSCodium 1.99.
+    validations:
+      required: true
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Plugin / extension version
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "macOS 15.1 / Windows 11 / Ubuntu 24.04"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / notes
+      description: >-
+        Relevant error notifications, IDE logs (Help > Show Log in Explorer/Finder), or the
+        extension's Output panel. Pasted text is rendered as code.
+      render: shell
+    validations:
+      required: false
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues and this is not a duplicate.
+          required: true
+        - label: My project is set up with GitButler (`but setup`) and checked out on `gitbutler/workspace`.
+          required: false

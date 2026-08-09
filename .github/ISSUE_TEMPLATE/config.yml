@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://github.com/BartInTheField/gitbutler-for-ide/tree/main/docs
+    about: Feature docs — tool window, virtual-branch commit, branch menu, and the VSCode extension.
+  - name: GitButler CLI setup
+    url: https://docs.gitbutler.com/cli-overview
+    about: Requirements and setup for the `but` CLI that this project drives.
