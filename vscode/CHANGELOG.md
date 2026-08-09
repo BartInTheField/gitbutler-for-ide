@@ -18,6 +18,7 @@ release body.
   virtual branch.
 - Drag-and-drop in the workspace tree: drag uncommitted changes onto a branch to commit
   them there, or onto a commit to amend them into it (after a confirmation).
+- Added commit history actions with right-click menus: Rename Commit and Uncommit on commit rows, and Uncommit File on a file inside a commit — wired to the shared core's reword/uncommit.
 
 ### Fixes
 
