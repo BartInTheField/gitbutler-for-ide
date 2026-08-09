@@ -9,6 +9,14 @@ release body.
 
 ### Features
 
+### Fixes
+
+### Internal improvements
+
+## 2026.8.9.2 - 2026-08-09
+
+### Features
+
 - Initial VSCode extension — a GitButler workspace tree view (unassigned
   changes, stacks, branches, commits and their files) plus Pull Workspace,
   Push, Apply, Unapply and Commit-to-virtual-branch commands, all powered by

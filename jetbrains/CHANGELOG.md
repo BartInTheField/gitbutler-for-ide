@@ -12,6 +12,14 @@ this file. On release, the Unreleased section becomes the release body.
 
 ### Internal improvements
 
+## 2026.8.9.1 - 2026-08-09
+
+### Features
+
+### Fixes
+
+### Internal improvements
+
 ## 2026.8.5.1 - 2026-08-05
 
 ### Features

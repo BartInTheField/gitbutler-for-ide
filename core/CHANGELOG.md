@@ -8,6 +8,14 @@ this file. On release, the Unreleased section becomes the release body.
 
 ### Features
 
+### Fixes
+
+### Internal improvements
+
+## 2026.8.9.1 / 2026.8.9.2 - 2026-08-09
+
+### Features
+
 - Extracted the GitButler CLI logic (commands, JSON parsing, models, path mapping, CLI orchestration) into a Kotlin Multiplatform `:core` library targeting JVM and JS.
 
 ### Fixes
