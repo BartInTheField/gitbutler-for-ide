@@ -1,9 +1,14 @@
 package me.inthefield.gitbutlerforjetbrains.core
 
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
+
 /**
  * Builds the exact `but` argument lists the plugin runs. Pure Kotlin — shared with the
  * integration tests so they execute the same commands the plugin does.
  */
+@OptIn(ExperimentalJsExport::class)
+@JsExport
 object ButCommands {
     fun status(): List<String> = listOf("status", "-f", "--json")
 

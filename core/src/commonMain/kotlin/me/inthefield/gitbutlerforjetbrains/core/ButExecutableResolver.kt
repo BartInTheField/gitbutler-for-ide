@@ -1,5 +1,8 @@
 package me.inthefield.gitbutlerforjetbrains.core
 
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
+
 /**
  * Resolves the path to the `but` CLI binary. Pure Kotlin operating on strings — the OS
  * name, PATH, PATHEXT, and home directory are passed in, and separators are derived from
@@ -9,6 +12,8 @@ package me.inthefield.gitbutlerforjetbrains.core
  * On Windows a bare `but` on PATH is really `but.exe` (or a `but.cmd`/`but.bat` shim); the
  * shell finds it via PATHEXT, so each PATH entry must be probed with those suffixes.
  */
+@OptIn(ExperimentalJsExport::class)
+@JsExport
 object ButExecutableResolver {
     private const val BINARY_NAME = "but"
     private const val DEFAULT_PATHEXT = ".COM;.EXE;.BAT;.CMD"

@@ -8,6 +8,8 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
 /**
  * Pure JSON parsing for the GitButler `but` CLI output. Multiplatform (kotlinx.serialization
@@ -17,6 +19,8 @@ import kotlinx.serialization.json.jsonObject
  * kotlinx.serialization exception propagate. Callers (the client) turn that into an Err.
  * [parseErrorMessage] never throws — it falls back to the raw input.
  */
+@OptIn(ExperimentalJsExport::class)
+@JsExport
 object ButJsonParser {
 
     private val json = Json {

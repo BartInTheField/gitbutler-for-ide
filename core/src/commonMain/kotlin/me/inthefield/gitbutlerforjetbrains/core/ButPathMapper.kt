@@ -1,6 +1,11 @@
 package me.inthefield.gitbutlerforjetbrains.core
 
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
+
 /** Maps IDE/editor-selected file paths to GitButler cliIds. Pure Kotlin over [PlatformPaths]. */
+@OptIn(ExperimentalJsExport::class)
+@JsExport
 object ButPathMapper {
     data class MapResult(val cliIds: List<String>, val missing: List<String>)
 
