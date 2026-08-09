@@ -165,6 +165,23 @@ export class GitButlerTreeDataProvider implements vscode.TreeDataProvider<GitBut
         return element;
     }
 
+    private changeNode(change: Change, commitId?: string): GitButlerNode {
+        const node = new GitButlerNode(
+            `${change.changeType} ${path.basename(change.filePath)}`,
+            vscode.TreeItemCollapsibleState.None,
+            'change',
+            undefined,
+            change.filePath,
+            commitId,
+            [],
+            commitId !== undefined
+        );
+        if (this.workspacePath) {
+            node.resourceUri = vscode.Uri.file(path.join(this.workspacePath, change.filePath));
+        }
+        return node;
+    }
+
     async getChildren(element?: GitButlerNode): Promise<GitButlerNode[]> {
         if (element) {
             return element.childrenNodes;
@@ -219,15 +236,7 @@ export class GitButlerTreeDataProvider implements vscode.TreeDataProvider<GitBut
                 c => !assignedCliIds.has(c.cliId)
             );
 
-            const unassignedChildNodes = unassignedChanges.map(change =>
-                new GitButlerNode(
-                    path.basename(change.filePath),
-                    vscode.TreeItemCollapsibleState.None,
-                    "change",
-                    undefined,
-                    change.filePath
-                )
-            );
+            const unassignedChildNodes = unassignedChanges.map(change => this.changeNode(change));
 
             const unassignedNode = new GitButlerNode(
                 `Unassigned changes (${unassignedChanges.length})`,
@@ -246,28 +255,13 @@ export class GitButlerTreeDataProvider implements vscode.TreeDataProvider<GitBut
             if (status.stacks && status.stacks.length > 0) {
                 for (const stack of status.stacks) {
                     const assignedChangeNodes = (stack.assignedChanges || []).map(change =>
-                        new GitButlerNode(
-                            path.basename(change.filePath),
-                            vscode.TreeItemCollapsibleState.None,
-                            "change",
-                            undefined,
-                            change.filePath
-                        )
+                        this.changeNode(change)
                     );
 
                     for (const branch of stack.branches || []) {
                         const commitNodes = (branch.commits || []).map(commit => {
                             const commitChangeNodes = (commit.changes || []).map(change =>
-                                new GitButlerNode(
-                                    path.basename(change.filePath),
-                                    vscode.TreeItemCollapsibleState.None,
-                                    "change",
-                                    undefined,
-                                    change.filePath,
-                                    commit.commitId,
-                                    [],
-                                    true
-                                )
+                                this.changeNode(change, commit.commitId)
                             );
                             return new GitButlerNode(
                                 `${commit.commitId.slice(0, 7)} ${commit.message}`,
@@ -306,16 +300,7 @@ export class GitButlerTreeDataProvider implements vscode.TreeDataProvider<GitBut
                 for (const branch of status.branches) {
                     const commitNodes = (branch.commits || []).map(commit => {
                         const commitChangeNodes = (commit.changes || []).map(change =>
-                            new GitButlerNode(
-                                path.basename(change.filePath),
-                                vscode.TreeItemCollapsibleState.None,
-                                "change",
-                                undefined,
-                                change.filePath,
-                                commit.commitId,
-                                [],
-                                true
-                            )
+                            this.changeNode(change, commit.commitId)
                         );
                         return new GitButlerNode(
                             `${commit.commitId.slice(0, 7)} ${commit.message}`,
