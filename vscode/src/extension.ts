@@ -65,6 +65,20 @@ export function callCore<T>(jsonStr: string): T {
     return envelope.value as T;
 }
 
+function branchStatusLabel(branchStatus: string): string {
+    switch (branchStatus) {
+        case '':
+            return '';
+        case 'nothingToPush':
+            return '✓ pushed';
+        case 'unpushedCommits':
+        case 'completelyUnpushed':
+            return 'unpushed';
+        default:
+            return branchStatus;
+    }
+}
+
 export class GitButlerNode extends vscode.TreeItem {
     constructor(
         public override readonly label: string,
@@ -216,7 +230,7 @@ export class GitButlerTreeDataProvider implements vscode.TreeDataProvider<GitBut
             );
 
             const unassignedNode = new GitButlerNode(
-                "Unassigned changes",
+                `Unassigned changes (${unassignedChanges.length})`,
                 unassignedChildNodes.length > 0
                     ? vscode.TreeItemCollapsibleState.Collapsed
                     : vscode.TreeItemCollapsibleState.None,
@@ -256,7 +270,7 @@ export class GitButlerTreeDataProvider implements vscode.TreeDataProvider<GitBut
                                 )
                             );
                             return new GitButlerNode(
-                                commit.message,
+                                `${commit.commitId.slice(0, 7)} ${commit.message}`,
                                 commitChangeNodes.length > 0
                                     ? vscode.TreeItemCollapsibleState.Collapsed
                                     : vscode.TreeItemCollapsibleState.None,
@@ -281,6 +295,10 @@ export class GitButlerTreeDataProvider implements vscode.TreeDataProvider<GitBut
                             undefined,
                             branchChildren
                         );
+                        const branchStatus = branchStatusLabel(branch.branchStatus);
+                        if (branchStatus) {
+                            branchNode.description = branchStatus;
+                        }
                         rootNodes.push(branchNode);
                     }
                 }
@@ -300,7 +318,7 @@ export class GitButlerTreeDataProvider implements vscode.TreeDataProvider<GitBut
                             )
                         );
                         return new GitButlerNode(
-                            commit.message,
+                            `${commit.commitId.slice(0, 7)} ${commit.message}`,
                             commitChangeNodes.length > 0
                                 ? vscode.TreeItemCollapsibleState.Collapsed
                                 : vscode.TreeItemCollapsibleState.None,
@@ -323,6 +341,10 @@ export class GitButlerTreeDataProvider implements vscode.TreeDataProvider<GitBut
                         undefined,
                         commitNodes
                     );
+                    const branchStatus = branchStatusLabel(branch.branchStatus);
+                    if (branchStatus) {
+                        branchNode.description = branchStatus;
+                    }
                     rootNodes.push(branchNode);
                 }
             }

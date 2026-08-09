@@ -19,6 +19,7 @@ release body.
 - Drag-and-drop in the workspace tree: drag uncommitted changes onto a branch to commit
   them there, or onto a commit to amend them into it (after a confirmation).
 - Added commit history actions with right-click menus: Rename Commit and Uncommit on commit rows, and Uncommit File on a file inside a commit — wired to the shared core's reword/uncommit.
+- Workspace tree rows now show richer labels: the unassigned node shows its change count (`Unassigned changes (N)`), branch rows show push status (`unpushed` / `✓ pushed`), and commit rows are prefixed with the 7-char commit sha.
 
 ### Fixes
 
