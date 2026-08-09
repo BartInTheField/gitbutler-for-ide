@@ -1,42 +1,73 @@
 <div align="center">
 
-<img src="src/main/resources/META-INF/pluginIcon.svg" width="96" height="96" alt="GitButler mark" />
+<img src="jetbrains/src/main/resources/META-INF/pluginIcon.svg" width="96" height="96" alt="GitButler mark" />
 
-# GitButler for IDE
+# GitButler for IDEs
 
-### Work with GitButler virtual branches without leaving your JetBrains IDE.
+### Work with GitButler virtual branches without leaving your IDE.
 
-Commit to a virtual branch straight from the IntelliJ commit window, and see your whole GitButler workspace — unassigned changes, stacks, branches, commits — in a dedicated tool window. No context-switch to the GitButler app or terminal.
+A monorepo containing GitButler integrations for JetBrains IDEs and VSCode, powered by a shared Kotlin Multiplatform core library.
 
 <br/>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-74D3D1.svg?style=flat-square)](LICENSE)
 [![IntelliJ Platform](https://img.shields.io/badge/IntelliJ%20Platform-2025.1%2B-74D3D1?style=flat-square&logo=intellijidea&logoColor=white)](https://plugins.jetbrains.com/)
 [![Built with Kotlin](https://img.shields.io/badge/Kotlin-JDK%2021-74D3D1?style=flat-square&logo=kotlin&logoColor=white)](https://kotlinlang.org/)
-[![CI: GitHub Actions](https://img.shields.io/badge/CI-GitHub%20Actions-74D3D1?style=flat-square&logo=githubactions&logoColor=white)](https://github.com/BartInTheField/gitbutler-jetbrains/actions)
+[![CI: GitHub Actions](https://img.shields.io/badge/CI-GitHub%20Actions-74D3D1?style=flat-square&logo=githubactions&logoColor=white)](https://github.com/BartInTheField/gitbutler-for-ide/actions)
 
 </div>
 
 > [!NOTE]
-> **Unofficial** plugin — not affiliated with or endorsed by GitButler.
+> **Unofficial** integrations — not affiliated with or endorsed by GitButler.
 > The GitButler mark is used under its [CC0-1.0 brand assets](https://github.com/gitbutlerapp/gitbutler-brand-assets).
 
 ---
 
-## What it does
+## 🧩 Monorepo Modules
 
-The plugin adds two GitButler surfaces to the IDE, both active only when your project is on `gitbutler/workspace`:
+| Module | Location | Target | Description |
+|---|---|---|---|
+| `:core` | `core/` | KMP (JVM + JS) | Core GitButler CLI orchestration, JSON parsing, models, and path mapping |
+| `:jetbrains` | `jetbrains/` | JVM (IntelliJ) | IntelliJ Platform plugin integrating GitButler into JetBrains IDEs |
+| `vscode` | `vscode/` | Node (VSCode) | VSCode extension consuming the `:core` Kotlin/JS compiled package |
 
-1. **Virtual-branch commit** — the Commit tool window's message-area toolbar (right next to the **Amend** toggle) gains an always-visible **GitButler branch** selector. Pick a virtual branch, check your files, and the commit is routed through the GitButler CLI (`but commit`) instead of plain git.
-2. **GitButler tool window** — a dedicated tool window on the bottom-left stripe (alongside the Git window) mirrors `but status` as a tree: unassigned changes, per-stack assigned changes, applied branches with push status, their commits, and the files each commit changed. Double-click a file to open its diff — the working-tree diff for an uncommitted change, the parent-vs-commit diff for a file inside a commit.
+---
 
-<div align="center">
+## 🛠 Building & Development
 
-`select branch` → `check files` → `Commit` → routed through `but` ✔
+### Core Library (`:core`)
 
-</div>
+Run unit tests across JVM and JS targets, or build the Kotlin/JS production library:
 
-## ✨ Features
+```bash
+./gradlew :core:allTests
+./gradlew :core:jsNodeProductionLibraryDistribution
+```
+
+### JetBrains Plugin (`:jetbrains`)
+
+Build the IntelliJ plugin ZIP distribution or launch a sandbox IDE:
+
+```bash
+./gradlew :jetbrains:test          # unit + integration tests
+./gradlew :jetbrains:buildPlugin   # produces jetbrains/build/distributions/*.zip
+./gradlew :jetbrains:runIde        # launch sandbox IDE with plugin
+```
+
+Install in IDE: **Settings → Plugins → ⚙ → Install Plugin from Disk…** and select `jetbrains/build/distributions/gitbutler-intellij-<version>.zip`.
+
+### VSCode Extension (`vscode`)
+
+Build the Kotlin/JS library first, then compile the VSCode extension:
+
+```bash
+./gradlew :core:jsNodeProductionLibraryDistribution
+cd vscode && npm run build
+```
+
+---
+
+## ✨ Features (JetBrains Plugin)
 
 - 🔍 **Zero-config detection** — activates only on a `gitbutler/workspace` branch; stays completely dormant otherwise
 - 🎯 **Inline branch selector** — always-visible virtual-branch combo in the commit toolbar, beside the Amend toggle
@@ -51,45 +82,26 @@ The plugin adds two GitButler surfaces to the IDE, both active only when your pr
 - 🔔 **Clear notifications** — committed / committed & pushed / push failed / commit failed; a failed commit never loses your message
 - 💾 **Remembers your last-used branch** per project
 
+---
+
 ## 📦 Requirements
 
 | | |
 |---|---|
-| **IDE** | IntelliJ IDEA 2025.1+ (Community or Ultimate) |
+| **JetBrains IDE** | IntelliJ IDEA 2025.1+ (Community or Ultimate) |
+| **VSCode** | VSCode 1.85+ |
 | **CLI** | [GitButler `but`](https://docs.gitbutler.com/cli-overview) 0.22.0+ on your `PATH` (on Windows resolved via PATHEXT, e.g. `but.exe`/`but.cmd`; also auto-detected in `~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin`) |
 | **Project** | Set up with GitButler (`but setup`) |
 
-## 🛠 Installation
-
-Not on the JetBrains Marketplace yet — build from source:
-
-```bash
-./gradlew buildPlugin
-```
-
-Then in the IDE: **Settings → Plugins → ⚙ → Install Plugin from Disk…** and pick
-`build/distributions/gitbutler-intellij-<version>.zip`.
-
-## 🚀 Usage
-
-### Commit to a virtual branch
-
-1. Open a GitButler-managed project (branch `gitbutler/workspace`).
-2. Open the Commit tool window — the **GitButler branch** selector sits in the message-area toolbar next to the Amend toggle.
-3. Choose a virtual branch — or `Git: no virtual branch` for a normal git commit.
-4. Select files, write a message, hit **Commit** (or **Commit and Push…**).
-
-### GitButler tool window
-
-Open the **GitButler** tool window from the bottom-left stripe (same corner as the Git window). It shows unassigned changes, each stack's assigned changes, and every applied branch with its commits — expand a commit to see the files it changed — refreshed automatically on repository changes. Use the toolbar's **Pull Workspace** button to run `but pull`, right-click a branch for **Unapply Branch** or **Push Branch**, and right-click a commit or one of its files for **Rename Commit**, **Uncommit** or **Uncommit File**.
+---
 
 ## ⚙️ How it works
 
-The plugin registers a `CheckinHandler` that intercepts the commit flow and a tool window that renders `but status`. All GitButler operations go through the `but` CLI with `--json`:
+All GitButler operations go through the `but` CLI with `--json`, orchestrated by the shared `:core` library:
 
 | Step | Command |
 |---|---|
-| List branches, map files → change IDs; render the tool window | `but status -f --json` |
+| List branches, map files → change IDs; render tree | `but status -f --json` |
 | Commit exactly the selected changes | `but commit -b <branch> -m <message> --json <change-ids>` |
 | Push (via *Commit and Push*, or tool-window context menu) | `but push <branch> --json` |
 | Pull Workspace toolbar button | `but pull --json` |
@@ -99,33 +111,25 @@ The plugin registers a `CheckinHandler` that intercepts the commit flow and a to
 | Uncommit / Uncommit File context menu | `but uncommit <commit-or-file-in-commit id> --json` |
 | Amend by dropping changes onto a commit | `but amend -t <commit> --json <change-ids>` |
 
-If no virtual branch is selected in the commit toolbar, the handler steps aside and IntelliJ's normal git commit runs untouched.
+---
 
 ## 📚 Documentation
 
+**JetBrains plugin**
 - [Virtual-branch commit](docs/virtual-branch-commit.md) — the commit-window integration
 - [GitButler tool window](docs/tool-window.md) — the workspace tree, toolbar, context menus and drag-and-drop
 - [Git branch menu](docs/git-branch-menu.md) — the GitButler Apply/Unapply submenu in the native branch context menu
 
-## 👩‍💻 Development
+**VSCode extension**
+- [GitButler for VSCode](docs/vscode.md) — the workspace tree view and commands, and how the extension consumes the shared `:core` package
 
-```bash
-./gradlew build      # compile + unit tests
-./gradlew runIde     # launch a sandbox IDE with the plugin
-./gradlew buildPlugin
-```
+---
 
-Kotlin · IntelliJ Platform Gradle Plugin 2.x · JDK 21.
+## 🔄 Continuous integration & Releases
 
-## 🔄 Continuous integration
+[GitHub Actions](https://github.com/BartInTheField/gitbutler-for-ide/actions) (`.github/workflows/ci.yml`) tests every PR and push to `main`, and requires each PR to add a `CHANGELOG.md` entry to at least one module (`core/CHANGELOG.md`, `jetbrains/CHANGELOG.md`, `vscode/CHANGELOG.md`). Releases live in a separate `release.yml` triggered manually from the Actions tab: it builds CalVer-versioned (`YYYY.M.D.<build>`) IntelliJ plugin ZIP and VSCode `.vsix` artifacts, assembling a single GitHub release with three sections (`## Core`, `## JetBrains`, `## VSCode`) from the three unreleased changelog sections.
 
-[GitHub Actions](https://github.com/BartInTheField/gitbutler-jetbrains/actions) (`.github/workflows/ci.yml`) tests every PR and push to `main`, and requires each PR to add a `CHANGELOG.md` entry. Releases live in a separate `release.yml` triggered manually from the Actions tab: it builds a CalVer-versioned (`YYYY.M.D.<build>`) plugin `.zip` and publishes a GitHub release with the `## Unreleased` changelog section as its body.
-
-## 🚧 Known limitations
-
-- Single git repository per project
-- Virtual branches with identical names across stacks are ambiguous (committed by name)
-- No way to create a new virtual branch from the commit window yet (`but commit -b <new-branch>` makes this a natural next feature)
+---
 
 ## 📄 License
 
