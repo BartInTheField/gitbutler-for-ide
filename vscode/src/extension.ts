@@ -178,6 +178,13 @@ export class GitButlerTreeDataProvider implements vscode.TreeDataProvider<GitBut
         );
         if (this.workspacePath) {
             node.resourceUri = vscode.Uri.file(path.join(this.workspacePath, change.filePath));
+            node.command = {
+                command: 'gitbutler.openDiff',
+                title: 'Open Diff',
+                arguments: commitId !== undefined
+                    ? [path.join(this.workspacePath, change.filePath), commitId]
+                    : [path.join(this.workspacePath, change.filePath)]
+            };
         }
         return node;
     }
@@ -772,6 +779,30 @@ export function activate(context: vscode.ExtensionContext) {
                 vscode.window.showInformationMessage(`GitButler: Uncommitted ${node.changeFilePath}`);
                 treeDataProvider.refresh();
             } catch {}
+        })
+    );
+    context.subscriptions.push(
+        vscode.commands.registerCommand('gitbutler.openDiff', async (filePath?: string, parentCommitId?: string) => {
+            if (!filePath) {
+                return;
+            }
+            const uri = vscode.Uri.file(filePath);
+            if (!parentCommitId) {
+                await vscode.commands.executeCommand('git.openChange', uri);
+                return;
+            }
+            const ext = vscode.extensions.getExtension<{ getAPI(version: number): { toGitUri(uri: vscode.Uri, ref: string): vscode.Uri } }>('vscode.git');
+            if (ext && !ext.isActive) {
+                await ext.activate();
+            }
+            const api = ext?.exports?.getAPI(1);
+            if (api?.toGitUri) {
+                const left = api.toGitUri(uri, `${parentCommitId}^`);
+                const right = api.toGitUri(uri, parentCommitId);
+                await vscode.commands.executeCommand('vscode.diff', left, right, `${path.basename(filePath)} (${parentCommitId.slice(0, 7)})`);
+            } else {
+                await vscode.commands.executeCommand('vscode.open', uri);
+            }
         })
     );
 }
