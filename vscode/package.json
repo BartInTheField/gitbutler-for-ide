@@ -123,6 +123,18 @@
         "command": "gitbutler.uncommitFile",
         "title": "Uncommit File",
         "category": "GitButler"
+      },
+      {
+        "command": "gitbutler.selectVirtualBranch",
+        "title": "Select Virtual Branch for Commits",
+        "category": "GitButler",
+        "icon": "$(git-branch)"
+      },
+      {
+        "command": "gitbutler.commitToVirtualBranch",
+        "title": "Commit to Virtual Branch",
+        "category": "GitButler",
+        "icon": "$(check)"
       }
     ],
     "menus": {
@@ -173,6 +185,13 @@
           "command": "gitbutler.uncommitFile",
           "when": "view == gitbutlerWorkspace && viewItem == commit-file",
           "group": "gitbutler@1"
+        }
+      ],
+      "scm/title": [
+        {
+          "command": "gitbutler.commitToVirtualBranch",
+          "when": "scmProvider == 'git'",
+          "group": "navigation"
         }
       ]
     }

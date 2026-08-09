@@ -22,6 +22,7 @@ release body.
 - Workspace tree rows now show richer labels: the unassigned node shows its change count (`Unassigned changes (N)`), branch rows show push status (`unpushed` / `✓ pushed`), and commit rows are prefixed with the 7-char commit sha.
 - Workspace tree file rows now show the change type as a prefix (e.g. `modified README.md`) and set the row's `resourceUri` so VS Code applies its native source-control color and status badge.
 - Clicking a file row in the GitButler tree now opens its diff — the working-tree change for uncommitted files, or the parent-vs-commit diff for a file inside a commit.
+- Route commits from VS Code's native Source Control view to a selected virtual branch: a status-bar item picks the target branch (or "no virtual branch" for plain git), and a **Commit to Virtual Branch** action on the SCM input routes the commit through the shared core.
 
 ### Fixes
 
