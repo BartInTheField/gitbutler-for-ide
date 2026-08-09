@@ -1,6 +1,7 @@
 package me.inthefield.gitbutlerforjetbrains.commit
 
 import me.inthefield.gitbutlerforjetbrains.core.ButResult
+import me.inthefield.gitbutlerforjetbrains.core.ButCommits
 import me.inthefield.gitbutlerforjetbrains.core.GitButlerService
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
@@ -67,7 +68,7 @@ class GitButlerCheckinHandler(
         return when (val r = commitResult) {
             is ButResult.Ok -> {
                 // The commit id may be unknown when the CLI's output shape differs.
-                val shortId = r.value.take(7).ifBlank { "Commit created" }
+                val shortId = ButCommits.shortId(r.value).ifBlank { "Commit created" }
                 val group = NotificationGroupManager.getInstance().getNotificationGroup(NOTIFICATION_GROUP)
                 when (val p = pushResult) {
                     is ButResult.Err ->

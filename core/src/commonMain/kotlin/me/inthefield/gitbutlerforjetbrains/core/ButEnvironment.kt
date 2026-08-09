@@ -1,7 +1,12 @@
 package me.inthefield.gitbutlerforjetbrains.core
 
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
+
 /** Captured output of one `but` invocation. [spawnError] non-null means the process never
  *  ran (binary missing on disk, spawn failure); [timedOut] means it was killed on timeout. */
+@OptIn(ExperimentalJsExport::class)
+@JsExport
 data class ProcessResult(
     val exitCode: Int = -1,
     val stdout: String = "",

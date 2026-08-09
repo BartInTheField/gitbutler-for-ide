@@ -1,8 +1,12 @@
 package me.inthefield.gitbutlerforjetbrains.core
 
 import kotlinx.serialization.Serializable
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 
 @Serializable
+@OptIn(ExperimentalJsExport::class)
+@JsExport
 data class ButCommit(
     val cliId: String,
     val commitId: String,
@@ -14,6 +18,8 @@ data class ButCommit(
 )
 
 @Serializable
+@OptIn(ExperimentalJsExport::class)
+@JsExport
 data class VirtualBranch(
     val cliId: String,
     val name: String,
@@ -22,12 +28,18 @@ data class VirtualBranch(
 )
 
 @Serializable
+@OptIn(ExperimentalJsExport::class)
+@JsExport
 data class ButStack(val cliId: String, val branches: List<VirtualBranch>, val assignedChanges: List<UncommittedChange> = emptyList())
 
 @Serializable
+@OptIn(ExperimentalJsExport::class)
+@JsExport
 data class UncommittedChange(val cliId: String, val filePath: String, val changeType: String)
 
 @Serializable
+@OptIn(ExperimentalJsExport::class)
+@JsExport
 data class WorkspaceStatus(
     val uncommittedChanges: List<UncommittedChange>,
     val branches: List<VirtualBranch>,

@@ -3,6 +3,8 @@ import * as path from 'path';
 import { me } from 'gitbutler-core';
 
 const GitButlerCore = me.inthefield.gitbutlerforjetbrains.core.GitButlerCore;
+const ButBranch = me.inthefield.gitbutlerforjetbrains.core.ButBranch;
+const ButCommits = me.inthefield.gitbutlerforjetbrains.core.ButCommits;
 
 export interface Change {
     cliId: string;
@@ -63,20 +65,6 @@ export function callCore<T>(jsonStr: string): T {
     }
 
     return envelope.value as T;
-}
-
-function branchStatusLabel(branchStatus: string): string {
-    switch (branchStatus) {
-        case '':
-            return '';
-        case 'nothingToPush':
-            return '✓ pushed';
-        case 'unpushedCommits':
-        case 'completelyUnpushed':
-            return 'unpushed';
-        default:
-            return branchStatus;
-    }
 }
 
 export class GitButlerNode extends vscode.TreeItem {
@@ -271,7 +259,7 @@ export class GitButlerTreeDataProvider implements vscode.TreeDataProvider<GitBut
                                 this.changeNode(change, commit.commitId)
                             );
                             return new GitButlerNode(
-                                `${commit.commitId.slice(0, 7)} ${commit.message}`,
+                                `${ButCommits.shortId(commit.commitId)} ${ButCommits.summary(commit.message)}`,
                                 commitChangeNodes.length > 0
                                     ? vscode.TreeItemCollapsibleState.Collapsed
                                     : vscode.TreeItemCollapsibleState.None,
@@ -296,7 +284,7 @@ export class GitButlerTreeDataProvider implements vscode.TreeDataProvider<GitBut
                             undefined,
                             branchChildren
                         );
-                        const branchStatus = branchStatusLabel(branch.branchStatus);
+                        const branchStatus = ButBranch.statusSuffix(branch.branchStatus);
                         if (branchStatus) {
                             branchNode.description = branchStatus;
                         }
@@ -310,7 +298,7 @@ export class GitButlerTreeDataProvider implements vscode.TreeDataProvider<GitBut
                             this.changeNode(change, commit.commitId)
                         );
                         return new GitButlerNode(
-                            `${commit.commitId.slice(0, 7)} ${commit.message}`,
+                            `${ButCommits.shortId(commit.commitId)} ${ButCommits.summary(commit.message)}`,
                             commitChangeNodes.length > 0
                                 ? vscode.TreeItemCollapsibleState.Collapsed
                                 : vscode.TreeItemCollapsibleState.None,
@@ -333,7 +321,7 @@ export class GitButlerTreeDataProvider implements vscode.TreeDataProvider<GitBut
                         undefined,
                         commitNodes
                     );
-                    const branchStatus = branchStatusLabel(branch.branchStatus);
+                    const branchStatus = ButBranch.statusSuffix(branch.branchStatus);
                     if (branchStatus) {
                         branchNode.description = branchStatus;
                     }
@@ -419,7 +407,7 @@ class GitButlerDragAndDropController implements vscode.TreeDragAndDropController
                     vscode.window.showErrorMessage("Could not resolve the target commit");
                     return;
                 }
-                const short = target.commitId.slice(0, 7);
+                const short = ButCommits.shortId(target.commitId);
                 const confirm = await vscode.window.showWarningMessage(
                     `Amend ${paths.length} file(s) into commit ${short}?`,
                     { modal: true },
@@ -720,7 +708,7 @@ export function activate(context: vscode.ExtensionContext) {
                     vscode.window.showErrorMessage("Could not resolve target commit");
                     return;
                 }
-                const id = commit.cliId || commit.commitId;
+                const id = ButCommits.effectiveId(commit.cliId, commit.commitId);
                 const message = await vscode.window.showInputBox({
                     prompt: "New commit message",
                     value: commit.message
@@ -753,9 +741,9 @@ export function activate(context: vscode.ExtensionContext) {
                     vscode.window.showErrorMessage("Could not resolve target commit");
                     return;
                 }
-                const id = commit.cliId || commit.commitId;
+                const id = ButCommits.effectiveId(commit.cliId, commit.commitId);
                 const confirm = await vscode.window.showWarningMessage(
-                    `Uncommit ${commit.commitId.slice(0, 7)}? Its changes return to your working tree.`,
+                    `Uncommit ${ButCommits.shortId(commit.commitId)}? Its changes return to your working tree.`,
                     { modal: true },
                     'Uncommit'
                 );
@@ -763,7 +751,7 @@ export function activate(context: vscode.ExtensionContext) {
                     return;
                 }
                 callCore<string>(await currentCore.uncommit(id));
-                vscode.window.showInformationMessage(`GitButler: Uncommitted ${commit.commitId.slice(0, 7)}`);
+                vscode.window.showInformationMessage(`GitButler: Uncommitted ${ButCommits.shortId(commit.commitId)}`);
                 treeDataProvider.refresh();
             } catch {}
         })
