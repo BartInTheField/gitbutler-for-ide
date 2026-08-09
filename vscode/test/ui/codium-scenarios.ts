@@ -29,6 +29,7 @@ function seedPopulatedWorkspace(): string {
   const change = (status.uncommittedChanges || []).find((c: { filePath: string }) => c.filePath === 'feature.ts');
   but('commit', '-b', 'feature-login', '-m', 'feat: add hello', '--json', change.cliId);
   fs.appendFileSync(path.join(dir, 'README.md'), 'work in progress\n');
+  fs.writeFileSync(path.join(dir, 'notes.txt'), 'todo\n');
   return dir;
 }
 
@@ -86,6 +87,15 @@ async function main(): Promise<void> {
     const rows = await win.locator('.part.sidebar .monaco-list-row').allInnerTexts();
     console.log('TREE ROWS:', JSON.stringify(rows.map((r) => r.replace(/\s+/g, ' ').trim()).filter(Boolean)));
 
+    // Multi-select (the fix under test): Ctrl-click two unassigned file rows and confirm
+    // both stay selected — only possible with canSelectMany on the tree view.
+    await win.locator('.part.sidebar .monaco-list-row', { hasText: 'README.md' }).first().click();
+    await win.locator('.part.sidebar .monaco-list-row', { hasText: 'notes.txt' }).first().click({ modifiers: ['Control'] });
+    await win.waitForTimeout(500);
+    const selected = await win.locator('.part.sidebar .monaco-list-row.selected').count();
+    console.log('SELECTED_ROWS=' + selected);
+    console.log('screenshot:', await shot(win, '04-multiselect.png', shotDir));
+
     // Command palette — evaluate command discoverability/naming.
     await win.keyboard.press('Control+Shift+P');
     await win.waitForTimeout(600);
@@ -95,6 +105,24 @@ async function main(): Promise<void> {
     const cmds = await win.locator('.quick-input-list .monaco-list-row').allInnerTexts();
     console.log('COMMANDS:', JSON.stringify(cmds.map((c) => c.replace(/\s+/g, ' ').trim()).filter(Boolean)));
     await win.keyboard.press('Escape');
+
+    // Drag-and-drop: drag an unassigned change onto a branch row; the extension should
+    // prompt to commit the dragged file(s) to that branch (handleDrop fired).
+    try {
+      const src = win.locator('.part.sidebar .monaco-list-row', { hasText: 'README.md' }).first();
+      const branch = win.locator('.part.sidebar .monaco-list-row', { hasText: 'feature-login' }).first();
+      await src.click();
+      await src.dragTo(branch);
+      await win.waitForTimeout(1_200);
+      const widget = win.locator('.quick-input-widget');
+      const shown = await widget.isVisible().catch(() => false);
+      const promptText = shown ? (await widget.innerText().catch(() => '')).replace(/\s+/g, ' ').trim() : '';
+      console.log('DND_INPUT_SHOWN=' + shown + ' PROMPT=' + JSON.stringify(promptText.slice(0, 90)));
+      console.log('screenshot:', await shot(win, '05-dnd-branch.png', shotDir));
+      await win.keyboard.press('Escape');
+    } catch (e) {
+      console.log('DND_ERROR=' + String(e).slice(0, 140));
+    }
 
     console.log('SCENARIOS OK');
   } finally {

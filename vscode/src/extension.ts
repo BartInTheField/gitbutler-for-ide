@@ -331,6 +331,104 @@ export class GitButlerTreeDataProvider implements vscode.TreeDataProvider<GitBut
     }
 }
 
+/**
+ * Drag-and-drop for the workspace tree, mirroring the JetBrains plugin: drag uncommitted
+ * change rows onto a branch to commit them there, or onto a commit to amend them into it.
+ */
+class GitButlerDragAndDropController implements vscode.TreeDragAndDropController<GitButlerNode> {
+    readonly dragMimeTypes = ['application/vnd.gitbutler.change-paths'];
+    readonly dropMimeTypes = ['application/vnd.gitbutler.change-paths'];
+
+    constructor(private readonly provider: GitButlerTreeDataProvider) {}
+
+    handleDrag(source: readonly GitButlerNode[], dataTransfer: vscode.DataTransfer): void {
+        const paths = source
+            .filter(n => n.nodeType === 'change' && n.changeFilePath)
+            .map(n => n.changeFilePath as string);
+        if (paths.length > 0) {
+            dataTransfer.set('application/vnd.gitbutler.change-paths', new vscode.DataTransferItem(JSON.stringify(paths)));
+        }
+    }
+
+    async handleDrop(target: GitButlerNode | undefined, dataTransfer: vscode.DataTransfer): Promise<void> {
+        const item = dataTransfer.get('application/vnd.gitbutler.change-paths');
+        if (!item || !target) {
+            return;
+        }
+        let paths: string[] = [];
+        try {
+            paths = JSON.parse(await item.asString());
+        } catch {
+            return;
+        }
+        if (paths.length === 0) {
+            return;
+        }
+
+        const core = this.provider.getCore();
+        const workspacePath = this.provider.getWorkspacePath();
+        if (!core || !workspacePath) {
+            vscode.window.showErrorMessage("GitButler core not initialized");
+            return;
+        }
+        const absolute = paths.map(p => path.join(workspacePath, p));
+
+        try {
+            if (target.nodeType === 'branch' && target.branchName) {
+                const message = await vscode.window.showInputBox({
+                    prompt: `Commit ${paths.length} file(s) to '${target.branchName}'`,
+                    placeHolder: "commit message"
+                });
+                if (!message) {
+                    return;
+                }
+                callCore<string>(await core.commit(target.branchName, message, absolute));
+                vscode.window.showInformationMessage(`GitButler: Committed ${paths.length} file(s) to '${target.branchName}'`);
+                this.provider.refresh();
+            } else if (target.nodeType === 'commit' && target.commitId) {
+                // Tree nodes carry the git SHA; `but amend -t` needs the GitButler change id (cliId).
+                const status = callCore<WorkspaceStatus>(await core.statusJson());
+                const targetCommit = (status.branches || [])
+                    .flatMap(b => b.commits || [])
+                    .find(c => c.commitId === target.commitId);
+                if (!targetCommit) {
+                    vscode.window.showErrorMessage("Could not resolve the target commit");
+                    return;
+                }
+                const short = target.commitId.slice(0, 7);
+                const confirm = await vscode.window.showWarningMessage(
+                    `Amend ${paths.length} file(s) into commit ${short}?`,
+                    { modal: true },
+                    "Amend"
+                );
+                if (confirm !== "Amend") {
+                    return;
+                }
+                callCore<void>(await core.amend(targetCommit.cliId, absolute));
+                vscode.window.showInformationMessage(`GitButler: Amended ${paths.length} file(s) into ${short}`);
+                this.provider.refresh();
+            }
+        } catch {
+            // Surfaced by callCore
+        }
+    }
+}
+
+async function promptForCommit(status: WorkspaceStatus): Promise<{ branch: string; message: string } | undefined> {
+    const branchNames = (status.branches || []).map(b => b.name);
+    const branch = branchNames.length === 0
+        ? await vscode.window.showInputBox({ prompt: "Enter target virtual branch name", placeHolder: "branch-name" })
+        : await vscode.window.showQuickPick(branchNames, { placeHolder: "Select target branch to commit to" });
+    if (!branch) {
+        return undefined;
+    }
+    const message = await vscode.window.showInputBox({ prompt: "Enter commit message", placeHolder: "commit message" });
+    if (!message) {
+        return undefined;
+    }
+    return { branch, message };
+}
+
 export function activate(context: vscode.ExtensionContext) {
     const treeDataProvider = new GitButlerTreeDataProvider();
 
@@ -351,9 +449,12 @@ export function activate(context: vscode.ExtensionContext) {
         })
     );
 
-    context.subscriptions.push(
-        vscode.window.registerTreeDataProvider('gitbutlerWorkspace', treeDataProvider)
-    );
+    const treeView = vscode.window.createTreeView('gitbutlerWorkspace', {
+        treeDataProvider,
+        canSelectMany: true,
+        dragAndDropController: new GitButlerDragAndDropController(treeDataProvider),
+    });
+    context.subscriptions.push(treeView);
 
     context.subscriptions.push(
         vscode.commands.registerCommand('gitbutler.refresh', () => {
@@ -492,26 +593,7 @@ export function activate(context: vscode.ExtensionContext) {
                     return;
                 }
 
-                const rawStatus = await currentCore.statusJson();
-                const status = callCore<WorkspaceStatus>(rawStatus);
-
-                const branchNames = (status.branches || []).map(b => b.name);
-                let targetBranch: string | undefined;
-                if (branchNames.length === 0) {
-                    targetBranch = await vscode.window.showInputBox({
-                        prompt: "Enter target virtual branch name",
-                        placeHolder: "branch-name"
-                    });
-                } else {
-                    targetBranch = await vscode.window.showQuickPick(branchNames, {
-                        placeHolder: "Select target branch to commit to"
-                    });
-                }
-
-                if (!targetBranch) {
-                    return;
-                }
-
+                const status = callCore<WorkspaceStatus>(await currentCore.statusJson());
                 const filePaths = (status.uncommittedChanges || []).map(c => c.filePath);
                 if (filePaths.length === 0) {
                     vscode.window.showWarningMessage("No uncommitted changes available to commit");
@@ -522,24 +604,52 @@ export function activate(context: vscode.ExtensionContext) {
                     canPickMany: true,
                     placeHolder: "Select files to commit"
                 });
-
                 if (!selectedFilePaths || selectedFilePaths.length === 0) {
                     return;
                 }
 
-                const commitMessage = await vscode.window.showInputBox({
-                    prompt: "Enter commit message",
-                    placeHolder: "commit message"
-                });
-
-                if (!commitMessage) {
+                const commit = await promptForCommit(status);
+                if (!commit) {
                     return;
                 }
 
                 const absoluteFilePaths = selectedFilePaths.map(fp => path.join(workspacePath, fp));
+                const commitId = callCore<string>(await currentCore.commit(commit.branch, commit.message, absoluteFilePaths));
+                vscode.window.showInformationMessage(`GitButler: Committed ${selectedFilePaths.length} file(s)${commitId ? ` (ID: ${commitId})` : ''}`);
+                treeDataProvider.refresh();
+            } catch {
+                // Surfaced by callCore or caught
+            }
+        })
+    );
 
-                const commitId = callCore<string>(await currentCore.commit(targetBranch, commitMessage, absoluteFilePaths));
-                vscode.window.showInformationMessage(`GitButler: Committed ${commitId ? `(ID: ${commitId})` : 'successfully'}`);
+    context.subscriptions.push(
+        vscode.commands.registerCommand('gitbutler.commitSelected', async () => {
+            try {
+                const currentCore = treeDataProvider.getCore();
+                const workspacePath = treeDataProvider.getWorkspacePath();
+                if (!currentCore || !workspacePath) {
+                    vscode.window.showErrorMessage("GitButler core not initialized");
+                    return;
+                }
+
+                const selectedPaths = treeView.selection
+                    .filter(n => n.nodeType === 'change' && n.changeFilePath)
+                    .map(n => n.changeFilePath as string);
+                if (selectedPaths.length === 0) {
+                    vscode.window.showWarningMessage("Select one or more changed files in the GitButler view first.");
+                    return;
+                }
+
+                const status = callCore<WorkspaceStatus>(await currentCore.statusJson());
+                const commit = await promptForCommit(status);
+                if (!commit) {
+                    return;
+                }
+
+                const absoluteFilePaths = selectedPaths.map(fp => path.join(workspacePath, fp));
+                const commitId = callCore<string>(await currentCore.commit(commit.branch, commit.message, absoluteFilePaths));
+                vscode.window.showInformationMessage(`GitButler: Committed ${selectedPaths.length} file(s)${commitId ? ` (ID: ${commitId})` : ''}`);
                 treeDataProvider.refresh();
             } catch {
                 // Surfaced by callCore or caught

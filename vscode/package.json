@@ -102,6 +102,12 @@
         "title": "Commit to virtual branch",
         "category": "GitButler",
         "icon": "$(check)"
+      },
+      {
+        "command": "gitbutler.commitSelected",
+        "title": "Commit Selected Changes",
+        "category": "GitButler",
+        "icon": "$(check)"
       }
     ],
     "menus": {
@@ -132,6 +138,11 @@
           "command": "gitbutler.unapply",
           "when": "view == gitbutlerWorkspace && viewItem == branch",
           "group": "inline@2"
+        },
+        {
+          "command": "gitbutler.commitSelected",
+          "when": "view == gitbutlerWorkspace && viewItem == change",
+          "group": "gitbutler@1"
         }
       ]
     }
