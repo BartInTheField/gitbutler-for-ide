@@ -41,10 +41,12 @@ import me.inthefield.gitbutlerforjetbrains.core.ButStack
 import me.inthefield.gitbutlerforjetbrains.core.GitButlerService
 import me.inthefield.gitbutlerforjetbrains.core.UncommittedChange
 import me.inthefield.gitbutlerforjetbrains.core.ButCommit
+import me.inthefield.gitbutlerforjetbrains.core.ButCommits
 import me.inthefield.gitbutlerforjetbrains.core.VirtualBranch
 import me.inthefield.gitbutlerforjetbrains.core.WorkspaceStatus
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.ui.SimpleToolWindowPanel
+import me.inthefield.gitbutlerforjetbrains.core.ButBranch
 import java.awt.event.KeyEvent
 import java.awt.event.MouseEvent
 import javax.swing.JComponent
@@ -238,7 +240,7 @@ class GitButlerStatusPanel(private val project: Project) : SimpleToolWindowPanel
     }
 
     /** The stable id to pass to `but reword`/`but uncommit`: the GitButler change id, falling back to the sha. */
-    private fun ButCommit.effectiveId(): String = cliId.ifBlank { commitId }
+    private fun ButCommit.effectiveId(): String = ButCommits.effectiveId(cliId, commitId)
 
     /**
      * Runs a GitButler mutation on a background thread (the service asserts non-EDT, which
@@ -572,15 +574,15 @@ class GitButlerStatusPanel(private val project: Project) : SimpleToolWindowPanel
 
                 is BranchNode -> {
                     append(payload.branch.name, SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
-                    val suffix = statusSuffix(payload.branch.branchStatus)
+                    val suffix = ButBranch.statusSuffix(payload.branch.branchStatus)
                     if (suffix.isNotEmpty()) {
                         append("  $suffix", SimpleTextAttributes.GRAYED_ATTRIBUTES)
                     }
                 }
 
                 is CommitNode -> {
-                    append("${payload.commit.commitId.take(7)} ", SimpleTextAttributes.GRAYED_ATTRIBUTES)
-                    append(payload.commit.message.lineSequence().firstOrNull().orEmpty())
+                    append("${ButCommits.shortId(payload.commit.commitId)} ", SimpleTextAttributes.GRAYED_ATTRIBUTES)
+                    append(ButCommits.summary(payload.commit.message))
                     if (payload.commit.conflicted) {
                         append(" (conflicted)", SimpleTextAttributes(SimpleTextAttributes.STYLE_PLAIN, JBColor.RED))
                     }
@@ -622,14 +624,6 @@ class GitButlerStatusPanel(private val project: Project) : SimpleToolWindowPanel
                 else -> null
             } ?: return SimpleTextAttributes.REGULAR_ATTRIBUTES
             return SimpleTextAttributes(SimpleTextAttributes.STYLE_PLAIN, status.color)
-        }
-
-        private fun statusSuffix(branchStatus: String): String = when (branchStatus) {
-            "" -> ""
-            "nothingToPush" -> "✓ pushed"
-            "unpushedCommits" -> "unpushed"
-            "completelyUnpushed" -> "unpushed"
-            else -> branchStatus
         }
     }
 }

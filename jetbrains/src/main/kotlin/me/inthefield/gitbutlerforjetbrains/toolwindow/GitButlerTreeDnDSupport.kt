@@ -11,6 +11,7 @@ import com.intellij.openapi.ui.MessageDialogBuilder
 import com.intellij.openapi.wm.ToolWindowManager
 import me.inthefield.gitbutlerforjetbrains.commit.GitButlerCommitSelection
 import me.inthefield.gitbutlerforjetbrains.core.ButResult
+import me.inthefield.gitbutlerforjetbrains.core.ButCommits
 import me.inthefield.gitbutlerforjetbrains.core.GitButlerService
 import java.awt.datatransfer.DataFlavor
 import java.awt.datatransfer.Transferable
@@ -179,7 +180,7 @@ object GitButlerTreeDnD {
         relativePaths: List<String>,
         runOperation: (title: String, successMessage: String, operation: () -> ButResult<Unit>) -> Unit,
     ) {
-        val firstLine = commit.message.lineSequence().firstOrNull().orEmpty()
+        val firstLine = ButCommits.summary(commit.message)
         val properties = PropertiesComponent.getInstance(project)
         val confirmed = properties.getBoolean(AMEND_CONFIRM_SUPPRESSED_KEY, false) ||
             MessageDialogBuilder.yesNo(
