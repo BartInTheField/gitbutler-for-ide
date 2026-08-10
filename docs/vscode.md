@@ -93,10 +93,10 @@ cd vscode && npm run build && npm run test:e2e
 
 ### UI e2e — the extension in a real editor
 
-Two interchangeable drivers open the extension in a real editor, open the GitButler
-activity-bar view, assert the workspace tree renders, and screenshot the running instance
-(the "headless Chrome" layer — the editor is an Electron/Chromium app). Both need a display,
-so run under `xvfb` on headless CI. Both seed a live workspace when `but` is on `PATH`.
+Three interchangeable drivers open the extension in a real editor, open the GitButler
+view, and assert the workspace tree renders (the "headless Chrome" layer — the editor is an
+Electron/Chromium app). The Electron drivers need a display, so run under `xvfb` on headless
+CI. All seed a live workspace when `but` is on `PATH`.
 
 - **VSCodium (default in CI)** — `test/ui/codium-smoke.ts`, driven by Playwright's Electron
   API. It attaches to any Electron binary via the built-in CDP, so it runs against the
@@ -115,6 +115,19 @@ so run under `xvfb` on headless CI. Both seed a live workspace when `but` is on 
 
   ```bash
   cd vscode && npm run build && xvfb-run -a npm run test:ui
+  ```
+
+- **Cursor (optional)** — `test/ui/cursor-smoke.ts`, driven by Playwright's Electron API like
+  the VSCodium smoke. Cursor drops the classic activity bar (its unified sidebar replaces
+  it), so the view is opened via the auto-generated **GitButler: Focus on Workspace View**
+  command instead of an activity-bar click. It asserts the tree resolves (renders a
+  GitButler-provider row) rather than spinning, but takes **no screenshot**: Cursor gates its
+  workbench behind an account login, so a fresh profile shows the login welcome over the
+  editor. Point `CURSOR_BIN` at the Electron binary; on macOS it defaults to the app bundle.
+
+  ```bash
+  cd vscode && npm run build
+  CURSOR_BIN=/Applications/Cursor.app/Contents/MacOS/Cursor npm run test:ui:cursor
   ```
 
 CI (`.github/workflows/ci.yml`): job `vscode` runs the core e2e; job `vscode-ui` downloads
