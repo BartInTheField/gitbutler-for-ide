@@ -44,7 +44,8 @@
     "test:e2e": "node --test test/e2e/*.test.cjs",
     "compile:ui": "tsc -p tsconfig.ui.json",
     "test:ui": "npm run compile && npm run compile:ui && extest setup-and-run \"out-ui/ui/*.test.js\" --extensions_dir .test-extensions",
-    "test:ui:codium": "npm run compile && npm run compile:ui && node out-ui/ui/codium-smoke.js"
+    "test:ui:codium": "npm run compile && npm run compile:ui && node out-ui/ui/codium-smoke.js",
+    "test:ui:cursor": "npm run compile && npm run compile:ui && node out-ui/ui/cursor-smoke.js"
   },
   "activationEvents": [
     "onView:gitbutlerWorkspace",

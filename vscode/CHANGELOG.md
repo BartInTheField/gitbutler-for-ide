@@ -13,6 +13,13 @@ release body.
 
 ### Internal improvements
 
+- Added a Cursor UI end-to-end smoke test (`npm run test:ui:cursor`, `test/ui/cursor-smoke.ts`)
+  that launches the extension in the Cursor editor via Playwright and asserts the GitButler
+  workspace tree resolves instead of spinning. Opens the view through the
+  **GitButler: Focus on Workspace View** command since Cursor has no classic activity bar; no
+  screenshot because Cursor gates its workbench behind login (the screenshotted UI check stays
+  on the VSCodium smoke).
+
 ## 2026.8.9.2 - 2026-08-09
 
 ### Features
