@@ -426,11 +426,53 @@ class GitButlerDragAndDropController implements vscode.TreeDragAndDropController
     }
 }
 
+/** Quick-pick entry that asks for a brand-new branch name instead of picking an existing one. */
+export const NEW_BRANCH_PICK = '$(add) New branch\u2026';
+
+/**
+ * Input box for a new virtual-branch name, validated as you type against the same git
+ * ref-name rules the CLI enforces (`ButBranch.newBranchNameError`), so a name `but` would
+ * reject is refused here instead of coming back as a CLI error.
+ */
+export async function promptForNewBranchName(prompt: string): Promise<string | undefined> {
+    const name = await vscode.window.showInputBox({
+        prompt,
+        placeHolder: 'my-feature',
+        validateInput: value => {
+            // An untouched, empty box shouldn't open already showing an error; an empty
+            // value is treated as a cancel below.
+            const trimmed = value.trim();
+            return trimmed.length === 0 ? null : ButBranch.newBranchNameError(trimmed);
+        }
+    });
+    const trimmed = name?.trim();
+    return trimmed ? trimmed : undefined;
+}
+
+/**
+ * Quick-pick over the applied virtual branches plus a "New branch..." entry. Picking that
+ * asks for a name and returns it WITHOUT creating anything: `but commit -b <name>` creates
+ * the branch as part of the commit, so cancelling the commit leaves the workspace untouched.
+ */
+export async function pickTargetBranch(status: WorkspaceStatus, placeHolder: string): Promise<string | undefined> {
+    const items: vscode.QuickPickItem[] = (status.branches || []).map(b => ({
+        label: b.name,
+        description: ButBranch.statusSuffix(b.branchStatus) || undefined
+    }));
+    items.push({ label: NEW_BRANCH_PICK, description: 'created by the commit itself (but commit -b)' });
+
+    const picked = await vscode.window.showQuickPick(items, { placeHolder });
+    if (!picked) {
+        return undefined;
+    }
+    if (picked.label === NEW_BRANCH_PICK) {
+        return promptForNewBranchName('Name for the new virtual branch (created when you commit)');
+    }
+    return picked.label;
+}
+
 async function promptForCommit(status: WorkspaceStatus): Promise<{ branch: string; message: string } | undefined> {
-    const branchNames = (status.branches || []).map(b => b.name);
-    const branch = branchNames.length === 0
-        ? await vscode.window.showInputBox({ prompt: "Enter target virtual branch name", placeHolder: "branch-name" })
-        : await vscode.window.showQuickPick(branchNames, { placeHolder: "Select target branch to commit to" });
+    const branch = await pickTargetBranch(status, "Select target branch to commit to");
     if (!branch) {
         return undefined;
     }
@@ -513,6 +555,11 @@ export function activate(context: vscode.ExtensionContext) {
         })
     );
 
+    // The branch a tree selection belongs to: branch and commit rows both carry branchName,
+    // so an action invoked from the view title bar can still target what the user selected.
+    const selectedBranchName = (): string | undefined =>
+        treeView.selection.find(n => n.branchName)?.branchName;
+
     context.subscriptions.push(
         vscode.commands.registerCommand('gitbutler.push', async (node?: GitButlerNode) => {
             try {
@@ -522,7 +569,7 @@ export function activate(context: vscode.ExtensionContext) {
                     return;
                 }
 
-                let targetBranch = node?.branchName;
+                let targetBranch = node?.branchName ?? selectedBranchName();
                 if (!targetBranch) {
                     const rawStatus = await currentCore.statusJson();
                     const status = callCore<WorkspaceStatus>(rawStatus);
@@ -648,6 +695,81 @@ export function activate(context: vscode.ExtensionContext) {
                 treeDataProvider.refresh();
             } catch {
                 // Surfaced by callCore or caught
+            }
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('gitbutler.newBranch', async () => {
+            try {
+                const currentCore = treeDataProvider.getCore();
+                if (!currentCore) {
+                    vscode.window.showErrorMessage("GitButler core not initialized");
+                    return;
+                }
+                const name = await promptForNewBranchName('Name for the new virtual branch');
+                if (!name) {
+                    return;
+                }
+                callCore<void>(await currentCore.newBranch(name));
+                vscode.window.showInformationMessage(`GitButler: Created virtual branch '${name}'`);
+                treeDataProvider.refresh();
+            } catch {
+                // Surfaced by callCore
+            }
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('gitbutler.commitToBranch', async (node?: GitButlerNode) => {
+            try {
+                const currentCore = treeDataProvider.getCore();
+                const workspacePath = treeDataProvider.getWorkspacePath();
+                if (!currentCore || !workspacePath) {
+                    vscode.window.showErrorMessage("GitButler core not initialized");
+                    return;
+                }
+
+                // Unlike gitbutler.commit, the branch is NOT asked for: it comes from the row
+                // the action was invoked on (or the selected one), which is the whole point.
+                const targetBranch = node?.branchName ?? selectedBranchName();
+                if (!targetBranch) {
+                    vscode.window.showWarningMessage("Select a branch in the GitButler view first.");
+                    return;
+                }
+
+                const status = callCore<WorkspaceStatus>(await currentCore.statusJson());
+                const uncommitted = (status.uncommittedChanges || []).map(c => c.filePath);
+                if (uncommitted.length === 0) {
+                    vscode.window.showWarningMessage("No uncommitted changes available to commit");
+                    return;
+                }
+
+                // Everything is pre-picked, so committing all of it is just Enter.
+                const picked = await vscode.window.showQuickPick(
+                    uncommitted.map(filePath => ({ label: filePath, picked: true })),
+                    { canPickMany: true, placeHolder: `Select files to commit to '${targetBranch}'` }
+                );
+                if (!picked || picked.length === 0) {
+                    return;
+                }
+
+                const message = await vscode.window.showInputBox({
+                    prompt: `Commit ${picked.length} file(s) to '${targetBranch}'`,
+                    placeHolder: "commit message"
+                });
+                if (!message) {
+                    return;
+                }
+
+                const absolute = picked.map(item => path.join(workspacePath, item.label));
+                const commitId = callCore<string>(await currentCore.commit(targetBranch, message, absolute));
+                vscode.window.showInformationMessage(
+                    `GitButler: Committed ${picked.length} file(s) to '${targetBranch}'${commitId ? ` (ID: ${commitId})` : ''}`
+                );
+                treeDataProvider.refresh();
+            } catch {
+                // Surfaced by callCore
             }
         })
     );
@@ -836,15 +958,36 @@ export function activate(context: vscode.ExtensionContext) {
                     return;
                 }
                 const status = callCore<WorkspaceStatus>(await currentCore.statusJson());
-                const branchNames = (status.branches || []).map(b => b.name);
                 const noBranch = 'Git: no virtual branch';
-                const picked = await vscode.window.showQuickPick([noBranch, ...branchNames], {
+                const items: vscode.QuickPickItem[] = [
+                    { label: noBranch, description: 'commit with plain git' },
+                    ...(status.branches || []).map(b => ({
+                        label: b.name,
+                        description: ButBranch.statusSuffix(b.branchStatus) || undefined
+                    })),
+                    { label: NEW_BRANCH_PICK, description: 'created by the commit itself (but commit -b)' }
+                ];
+                const picked = await vscode.window.showQuickPick(items, {
                     placeHolder: 'Route Source Control commits to a virtual branch'
                 });
                 if (picked === undefined) {
                     return;
                 }
-                await context.workspaceState.update(selectedBranchKey, picked === noBranch ? null : picked);
+                // A name typed through "New branch..." is only remembered here; the branch is
+                // created by the commit, so nothing exists until the user commits.
+                let selection: string | null;
+                if (picked.label === noBranch) {
+                    selection = null;
+                } else if (picked.label === NEW_BRANCH_PICK) {
+                    const name = await promptForNewBranchName('Name for the new virtual branch (created when you commit)');
+                    if (!name) {
+                        return;
+                    }
+                    selection = name;
+                } else {
+                    selection = picked.label;
+                }
+                await context.workspaceState.update(selectedBranchKey, selection);
                 updateScmStatusBar();
             } catch {
                 // Surfaced by callCore

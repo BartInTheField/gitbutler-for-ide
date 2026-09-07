@@ -56,6 +56,12 @@ class GitButlerCore(workspacePath: String) {
 
     fun unapply(branch: String): Promise<String> = GlobalScope.promise { unitEnvelope(client.unapply(branch)) }
 
+    /**
+     * Creates an empty, unstacked virtual branch. Rejects a name git would refuse before
+     * spawning `but`; hosts can pre-validate the same way via [ButBranch.newBranchNameError].
+     */
+    fun newBranch(name: String): Promise<String> = GlobalScope.promise { unitEnvelope(client.newBranch(name)) }
+
     fun uncommit(id: String): Promise<String> = GlobalScope.promise { unitEnvelope(client.uncommit(id)) }
 
     fun reword(commitId: String, message: String): Promise<String> =

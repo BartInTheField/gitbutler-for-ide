@@ -1,7 +1,7 @@
 {
   "name": "gitbutler-for-ide",
   "displayName": "GitButler for IDE",
-  "description": "Work with GitButler virtual branches without leaving your editor: a workspace tree view plus pull, push, apply, unapply and commit-to-virtual-branch commands, powered by the GitButler `but` CLI.",
+  "description": "Work with GitButler virtual branches without leaving your editor: a workspace tree view plus pull, push, apply, unapply, new-branch and commit-to-virtual-branch commands, powered by the GitButler `but` CLI.",
   "publisher": "BartInTheField",
   "version": "0.1.0",
   "license": "MIT",
@@ -83,10 +83,22 @@
         "icon": "$(cloud-download)"
       },
       {
+        "command": "gitbutler.newBranch",
+        "title": "New Virtual Branch",
+        "category": "GitButler",
+        "icon": "$(add)"
+      },
+      {
         "command": "gitbutler.push",
         "title": "Push Branch",
         "category": "GitButler",
         "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "gitbutler.commitToBranch",
+        "title": "Commit to Branch",
+        "category": "GitButler",
+        "icon": "$(git-commit)"
       },
       {
         "command": "gitbutler.apply",
@@ -96,7 +108,8 @@
       {
         "command": "gitbutler.unapply",
         "title": "Unapply Branch",
-        "category": "GitButler"
+        "category": "GitButler",
+        "icon": "$(archive)"
       },
       {
         "command": "gitbutler.commit",
@@ -151,21 +164,36 @@
           "group": "navigation@2"
         },
         {
-          "command": "gitbutler.commit",
+          "command": "gitbutler.newBranch",
           "when": "view == gitbutlerWorkspace",
           "group": "navigation@3"
+        },
+        {
+          "command": "gitbutler.commit",
+          "when": "view == gitbutlerWorkspace",
+          "group": "navigation@4"
+        },
+        {
+          "command": "gitbutler.push",
+          "when": "view == gitbutlerWorkspace",
+          "group": "navigation@5"
         }
       ],
       "view/item/context": [
         {
-          "command": "gitbutler.push",
+          "command": "gitbutler.commitToBranch",
           "when": "view == gitbutlerWorkspace && viewItem == branch",
           "group": "inline@1"
         },
         {
-          "command": "gitbutler.unapply",
+          "command": "gitbutler.push",
           "when": "view == gitbutlerWorkspace && viewItem == branch",
           "group": "inline@2"
+        },
+        {
+          "command": "gitbutler.unapply",
+          "when": "view == gitbutlerWorkspace && viewItem == branch",
+          "group": "inline@3"
         },
         {
           "command": "gitbutler.commitSelected",

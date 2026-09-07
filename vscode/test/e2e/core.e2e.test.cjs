@@ -39,6 +39,20 @@ function unwrap(jsonStr) {
 
 let repo;
 
+/** Creates a throwaway GitButler workspace, mirroring the JetBrains `freshRepo` helper. */
+function freshWorkspace(prefix) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  const git = (...a) => execFileSync('git', a, { cwd: dir, stdio: 'ignore' });
+  git('init', '-q', '-b', 'main', '.');
+  git('config', 'user.email', 'e2e@example.com');
+  git('config', 'user.name', 'e2e');
+  fs.writeFileSync(path.join(dir, 'a.txt'), 'hello\n');
+  git('add', '-A');
+  git('commit', '-qm', 'init');
+  execFileSync('but', ['setup', '--init'], { cwd: dir, stdio: 'ignore' });
+  return dir;
+}
+
 before(() => {
   if (skip) return;
   repo = fs.mkdtempSync(path.join(os.tmpdir(), 'gb-e2e-'));
@@ -87,4 +101,39 @@ test('commit routes a real change onto a virtual branch', { skip }, async () => 
   assert.ok(branch.commits.length >= 1, 'expected at least one commit on the virtual branch');
   const stillUncommitted = status.uncommittedChanges.map((c) => c.filePath);
   assert.ok(!stillUncommitted.includes('a.txt'), 'a.txt should be committed, not uncommitted');
+});
+
+test('newBranch creates a real, empty virtual branch', { skip }, async () => {
+  const dir = freshWorkspace('gb-e2e-newbranch-');
+  try {
+    const gb = new GitButlerCore(dir);
+    unwrap(await gb.newBranch('feature-new'));
+
+    const status = unwrap(await gb.statusJson());
+    const branch = status.branches.find((b) => b.name === 'feature-new');
+    assert.ok(branch, `expected 'feature-new' in ${JSON.stringify(status.branches.map((b) => b.name))}`);
+    // `commits` is ABSENT rather than [] — the core serializes with encodeDefaults=false, so
+    // empty collections drop out of the envelope. That is why extension.ts reads every list
+    // as `(x || [])`, and this assertion is written the same defensive way on purpose.
+    assert.strictEqual((branch.commits || []).length, 0, 'a brand new branch has no commits');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('newBranch refuses a name git would reject, without touching the workspace', { skip }, async () => {
+  const dir = freshWorkspace('gb-e2e-badname-');
+  try {
+    const gb = new GitButlerCore(dir);
+    // The core validates locally (ButBranch.newBranchNameError) and never spawns `but`,
+    // so this must come back as an error envelope rather than a CLI failure.
+    const env = JSON.parse(await gb.newBranch('bad name'));
+    assert.strictEqual(env.ok, false, 'a name with whitespace must be rejected');
+    assert.match(env.error, /whitespace/i, `unexpected message: ${env.error}`);
+
+    const status = unwrap(await gb.statusJson());
+    assert.strictEqual(status.branches.length, 0, 'no branch may exist after a rejected name');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });

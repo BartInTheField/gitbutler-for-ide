@@ -22,13 +22,20 @@ A **GitButler** view container on the activity bar hosts a workspace tree that m
 When the open folder isn't on `gitbutler/workspace`, the tree shows a single
 **"Not a GitButler workspace"** row.
 
+Refresh, Pull Workspace, New Virtual Branch, Commit and Push sit in the view's title bar;
+hovering a branch row reveals inline Commit to Branch, Push and Unapply icons. Every branch
+picker also offers **New branch…**, which names a branch that `but commit -b` creates with
+the commit — see [the VSCode docs](https://github.com/BartInTheField/gitbutler-for-ide/blob/main/docs/vscode.md).
+
 ## Commands
 
 | Command | ID | Runs |
 |---|---|---|
 | Refresh | `gitbutler.refresh` | Re-reads `but status` and repaints the tree |
 | Pull Workspace | `gitbutler.pull` | `but pull` |
+| New Virtual Branch | `gitbutler.newBranch` | `but branch new <name>` |
 | Push Branch | `gitbutler.push` | `but push <branch>` |
+| Commit to Branch | `gitbutler.commitToBranch` | `but commit -b <branch>` to the branch you invoked it on |
 | Apply Branch | `gitbutler.apply` | `but apply <branch>` |
 | Unapply Branch | `gitbutler.unapply` | `but unapply <branch>` |
 | Commit to virtual branch | `gitbutler.commit` | `but commit -b <branch> -m <message> <ids>` |
