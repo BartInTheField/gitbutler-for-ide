@@ -20,6 +20,9 @@ object ButCommands {
 
     fun unapply(branchName: String): List<String> = listOf("unapply", branchName, "--json")
 
+    /** `but branch new <name>` — creates an empty, unstacked virtual branch in the workspace. */
+    fun branchNew(name: String): List<String> = listOf("branch", "new", name, "--json")
+
     /** [cliIds] are the changes to commit, passed positionally; [branchName] is the target branch. */
     fun commit(branchName: String, message: String, cliIds: List<String>): List<String> =
         listOf("commit", "-b", branchName, "-m", message, "--json") + cliIds

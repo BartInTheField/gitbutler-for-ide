@@ -10,13 +10,15 @@ import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.actionSystem.KeepPopupOnPerform
 import com.intellij.openapi.actionSystem.ToggleAction
 import com.intellij.openapi.actionSystem.ex.ComboBoxAction
+import com.intellij.openapi.project.Project
 import javax.swing.JComponent
 
 /**
  * Always-visible virtual-branch selector shown inline in the Commit tool window's
  * message-area toolbar (the strip that holds the Amend toggle). Picking a branch
  * routes the next commit through the GitButler CLI; picking "no virtual branch"
- * lets IntelliJ's normal git commit run.
+ * lets IntelliJ's normal git commit run. "New branch…" types a name that does not
+ * exist yet — `but commit -b` creates it when the commit runs.
  */
 class GitButlerBranchComboAction : ComboBoxAction() {
 
@@ -55,15 +57,21 @@ class GitButlerBranchComboAction : ComboBoxAction() {
         group.addSeparator()
 
         val branches = selection?.cachedBranches.orEmpty()
-        if (branches.isEmpty()) {
+        val selected = selection?.selectedBranch
+        // A name typed through "New branch…" isn't in the status mirror yet (nor is a branch
+        // that has since disappeared) — list it anyway so the current selection stays visible
+        // and checked instead of the popup showing nothing selected.
+        val items = if (selected != null && selected !in branches) branches + selected else branches
+        if (items.isEmpty()) {
             selection?.lastError?.let { group.add(DisabledInfoAction(it)) }
         } else {
-            branches.forEach { branch ->
+            items.forEach { branch ->
                 group.add(SelectBranchAction(branch, branch, selection))
             }
         }
 
         group.addSeparator()
+        group.add(NewBranchAction(project, selection))
         group.add(RefreshAction(selection))
         return group
     }
@@ -106,6 +114,33 @@ class GitButlerBranchComboAction : ComboBoxAction() {
 
         override fun actionPerformed(e: AnActionEvent) {
             // no-op
+        }
+    }
+
+    /**
+     * Selects a branch name that does not exist yet: `but commit -b <name>` creates it as an
+     * unstacked branch when the commit runs, so nothing is created until the user commits.
+     * The name is only kept in the selection, never in [GitButlerCommitSelection.cachedBranches],
+     * which stays a mirror of `but status`.
+     */
+    private class NewBranchAction(
+        private val project: Project?,
+        private val selection: GitButlerCommitSelection?,
+    ) : AnAction("New branch…", "Commit to a new virtual branch (but commit -b <new-branch>)", null) {
+        override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
+
+        override fun update(e: AnActionEvent) {
+            e.presentation.isEnabled = project != null && selection != null
+        }
+
+        override fun actionPerformed(e: AnActionEvent) {
+            val project = project ?: return
+            val name = GitButlerNewBranchPrompt.ask(
+                project,
+                "New Virtual Branch",
+                "Name for the new virtual branch (created when you commit):",
+            ) ?: return
+            selection?.selectedBranch = name
         }
     }
 

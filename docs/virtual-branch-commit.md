@@ -18,6 +18,14 @@ The selector always shows — no per-project setup, no keybinding — and quietl
 
 The plugin remembers the last-used virtual branch per project.
 
+## Committing to a new virtual branch
+
+The combo's **New branch…** item prompts for a name and selects it, so the next commit lands on a branch that doesn't exist yet: `but commit -b <name>` creates it as an unstacked branch as part of the commit. Nothing is created until you actually commit, so cancelling the commit leaves the workspace untouched.
+
+The name is validated as you type against git's ref-name rules (no whitespace, no `~^:?*[\`, no `..`, no `/` at either end, and so on), so an invalid one is refused in the dialog instead of coming back as a CLI error. The typed name stays visible and checked in the combo even though `but status` doesn't know it yet.
+
+To create an *empty* virtual branch up front instead — a lane to drag changes onto — use **New Virtual Branch…** in the [GitButler tool window](tool-window.md), which runs `but branch new`.
+
 ## CLI commands used
 
 Every GitButler action runs the `but` CLI with `--json` (plus `BUT_OUTPUT_FORMAT=json` in the environment):
@@ -26,6 +34,7 @@ Every GitButler action runs the `but` CLI with `--json` (plus `BUT_OUTPUT_FORMAT
 |---|---|
 | List branches; map file paths → change IDs | `but status -f --json` |
 | Commit the selected changes | `but commit -b <branch> -m <message> --json <change-ids>` |
+| Commit to a name that doesn't exist yet | same command — `-b` creates the branch when it is unknown |
 | Push (only for *Commit and Push*) | `but push <branch> --json` |
 
 If no virtual branch is picked, the plugin's checkin handler steps aside and IntelliJ's normal git commit runs untouched.
@@ -44,4 +53,4 @@ All commit outcomes land in the "GitButler" notification group:
 
 - Single git repository per project.
 - Virtual branches with identical names across stacks are ambiguous — the CLI is invoked by branch name.
-- There's no way to create a new virtual branch from the commit window yet. (`but commit -b <new-branch>` is the natural hook for this.)
+- New branches are always created unstacked; there's no way to stack one above or below an existing branch from the commit window (`but branch new --above/--below` would be the hook for this).

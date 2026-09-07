@@ -8,6 +8,7 @@ import me.inthefield.gitbutlerforjetbrains.core.WorkspaceStatus
 import org.junit.AfterClass
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
@@ -109,6 +110,14 @@ class ButStatusIntegrationTest {
     private fun but(repoDir: String, args: List<String>): String =
         exec(repoDir, (listOf("but") + args).joinToString(" ") { shellQuote(it) })
 
+    /** Runs `but` expecting a non-zero exit; asserts the failure and returns stdout + stderr. */
+    private fun butExpectingFailure(repoDir: String, args: List<String>): String {
+        val command = (listOf("but") + args).joinToString(" ") { shellQuote(it) }
+        val result = container.execInContainer("sh", "-c", "cd '$repoDir' && $command")
+        assertNotEquals("command was expected to fail but succeeded: $command", 0, result.exitCode)
+        return result.stdout + result.stderr
+    }
+
     private fun shellQuote(arg: String): String = "'" + arg.replace("'", "'\\''") + "'"
 
     /** Runs the plugin's own status command ([ButCommands.status]) and parses it into the plugin model. */
@@ -191,6 +200,65 @@ class ButStatusIntegrationTest {
         assertTrue("authorName should be non-empty", commit.authorName.isNotEmpty())
         assertFalse("commit should not be conflicted", commit.conflicted)
         assertTrue("branchStatus should be non-empty", branch.branchStatus.isNotEmpty())
+    }
+
+    @Test
+    fun branchNew_createsEmptyAppliedBranch() {
+        val repo = freshRepo("branchnew")
+
+        // Through the plugin's own ButCommands.branchNew — the command the tool window's
+        // "New Virtual Branch" action sends. exec() asserts exit 0, so this pins the
+        // `but branch new <name> --json` contract end-to-end.
+        but(repo, ButCommands.branchNew("feature-new"))
+
+        val s = status(repo)
+        val branch = s.stacks
+            .flatMap { it.branches }
+            .singleOrNull { it.name == "feature-new" }
+        assertNotNull("feature-new must appear as an applied branch", branch)
+        assertTrue(
+            "a brand new branch has no commits: ${branch!!.commits.map { it.message }}",
+            branch.commits.isEmpty(),
+        )
+    }
+
+    @Test
+    fun branchNew_withInvalidName_failsWithoutCreatingAnything() {
+        val repo = freshRepo("branchnew-invalid")
+
+        // The plugin refuses these names before spawning `but` (ButBranch.newBranchNameError);
+        // this pins that the CLI agrees they are invalid, so the local check can never be
+        // stricter than reality in a way that blocks a name `but` would have accepted.
+        butExpectingFailure(repo, ButCommands.branchNew("bad name"))
+
+        assertTrue("no branch may exist after a rejected name", status(repo).branches.isEmpty())
+    }
+
+    @Test
+    fun commit_toUnknownBranch_createsThatBranch() {
+        val repo = freshRepo("commit-new-branch")
+        exec(repo, "echo hi > hello.txt")
+
+        val before = status(repo)
+        assertTrue("no branch should exist yet", before.branches.isEmpty())
+        val mapped = ButPathMapper.map(repo, listOf("$repo/hello.txt"), before.uncommittedChanges)
+        assertTrue("ButPathMapper must not report missing paths: ${mapped.missing}", mapped.missing.isEmpty())
+
+        // The contract behind the commit combo's "New branch…" item and the tool window's
+        // commit action: `-b <name>` creates the branch when it does not exist yet, so the
+        // plugin never needs a separate create step before committing.
+        but(repo, ButCommands.commit("brand-new", "first commit", mapped.cliIds))
+
+        val after = status(repo)
+        val branch = after.stacks
+            .flatMap { it.branches }
+            .singleOrNull { it.name == "brand-new" }
+        assertNotNull("`but commit -b brand-new` must create the branch", branch)
+        assertEquals("expected exactly one commit on brand-new", 1, branch!!.commits.size)
+        assertTrue(
+            "commit message should contain 'first commit': ${branch.commits[0].message}",
+            branch.commits[0].message.contains("first commit"),
+        )
     }
 
     @Test

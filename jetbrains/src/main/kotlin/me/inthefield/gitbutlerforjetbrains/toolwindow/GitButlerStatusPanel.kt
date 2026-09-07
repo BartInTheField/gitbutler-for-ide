@@ -36,6 +36,7 @@ import com.intellij.util.ui.tree.TreeUtil
 import com.intellij.ui.treeStructure.Tree
 import com.intellij.vcs.log.impl.HashImpl
 import com.intellij.vcs.log.impl.VcsLogNavigationUtil
+import me.inthefield.gitbutlerforjetbrains.commit.GitButlerNewBranchPrompt
 import me.inthefield.gitbutlerforjetbrains.core.ButResult
 import me.inthefield.gitbutlerforjetbrains.core.ButStack
 import me.inthefield.gitbutlerforjetbrains.core.GitButlerService
@@ -180,9 +181,15 @@ class GitButlerStatusPanel(private val project: Project) : SimpleToolWindowPanel
     private fun repoRoot() = GitButlerService.getInstance(project).workspaceRepository()?.root
 
     private fun buildToolbar(): JComponent {
+        // Toolbar variants stay VISIBLE and go gray when the selection doesn't fit, so the
+        // actions are discoverable at a glance; the context-menu variants hide instead.
         val group = DefaultActionGroup().apply {
             add(RefreshAction())
             add(PullWorkspaceAction())
+            addSeparator()
+            add(NewBranchAction())
+            add(CommitToBranchAction(hideWhenUnavailable = false))
+            add(PushBranchAction(hideWhenUnavailable = false))
         }
         val actionToolbar = ActionManager.getInstance()
             .createActionToolbar("GitButlerToolWindow", group, true)
@@ -190,7 +197,10 @@ class GitButlerStatusPanel(private val project: Project) : SimpleToolWindowPanel
         return actionToolbar.component
     }
 
-    /** Right-click menu: unapply/push a selected branch, or rename/uncommit a selected commit. */
+    /**
+     * Right-click menu: commit to / push / unapply a selected branch, create a new virtual
+     * branch, or rename/uncommit a selected commit.
+     */
     private fun installContextMenu() {
         // Select the row under the cursor before the menu's update() reads the selection —
         // don't rely on the tree doing this on popup trigger.
@@ -210,8 +220,10 @@ class GitButlerStatusPanel(private val project: Project) : SimpleToolWindowPanel
         })
 
         val group = DefaultActionGroup().apply {
+            add(CommitToBranchAction(hideWhenUnavailable = true))
+            add(PushBranchAction(hideWhenUnavailable = true))
             add(UnapplyBranchAction())
-            add(PushBranchAction())
+            add(NewBranchAction())
             addSeparator()
             add(ShowInGitLogAction())
             add(RenameCommitAction())
@@ -225,6 +237,32 @@ class GitButlerStatusPanel(private val project: Project) : SimpleToolWindowPanel
     private fun selectedBranch(): VirtualBranch? {
         val node = tree.selectionPath?.lastPathComponent as? DefaultMutableTreeNode
         return (node?.userObject as? BranchNode)?.branch
+    }
+
+    /**
+     * The branch the current selection belongs to: the selected [BranchNode] itself, or the
+     * one enclosing the selected row (an assigned change, a commit, a file in a commit).
+     * Null for rows outside every branch, e.g. an unassigned change.
+     *
+     * Commit and Push use this so they also work from a row *under* a branch; Unapply keeps
+     * the stricter [selectedBranch] — it takes work out of the workspace, so it demands the
+     * branch row itself rather than inferring the target.
+     */
+    private fun targetBranch(): VirtualBranch? =
+        GitButlerTreeSelection.ancestorPayload(
+            tree.selectionPath?.lastPathComponent as? DefaultMutableTreeNode,
+        ) { (it as? BranchNode)?.branch }
+
+    /**
+     * The repo-relative paths of the selected rows when *every* one is an uncommitted-change
+     * row, else null — the same selection shape the tree lets you drag. Used to preselect the
+     * commit window's checked files; null means "leave the user's checkboxes alone".
+     */
+    private fun selectedChangePaths(): List<String>? {
+        val payloads = tree.selectionPaths
+            ?.map { (it.lastPathComponent as? DefaultMutableTreeNode)?.userObject }
+            ?: return null
+        return GitButlerTreeSelection.allOrNull(payloads) { (it as? ChangeNode)?.change?.filePath }
     }
 
     /** The [ButCommit] of the currently-selected [CommitNode], or null if the selection is elsewhere. */
@@ -412,6 +450,59 @@ class GitButlerStatusPanel(private val project: Project) : SimpleToolWindowPanel
         }
     }
 
+    /**
+     * Opens the IDE Commit tool window with the target branch preselected in the GitButler
+     * combo, so the commit is routed through `but commit -b <branch>` by the checkin handler.
+     * When the selection is uncommitted-change rows, exactly those files are checked.
+     */
+    private inner class CommitToBranchAction(private val hideWhenUnavailable: Boolean) :
+        AnAction(AllIcons.Actions.Commit) {
+        override fun getActionUpdateThread() = ActionUpdateThread.EDT
+
+        override fun update(e: AnActionEvent) {
+            // setText(_, false): branch names carry underscores/ampersands — keep them literal, no mnemonics.
+            e.presentation.setText("Commit to Branch", false)
+            val branch = targetBranch()
+            e.presentation.description = if (branch != null) {
+                "Commit to \"${branch.name}\" from the Commit tool window"
+            } else {
+                "Select a branch (or a row under one) to commit to it"
+            }
+            e.presentation.isEnabled = branch != null && !operationInFlight
+            e.presentation.isVisible = !hideWhenUnavailable || branch != null
+        }
+
+        override fun actionPerformed(e: AnActionEvent) {
+            val branch = targetBranch() ?: return
+            GitButlerCommitLauncher.openCommitFor(project, branch.name, selectedChangePaths())
+        }
+    }
+
+    /** Creates an empty virtual branch (`but branch new`) to commit to or drag changes onto. */
+    private inner class NewBranchAction : AnAction(
+        "New Virtual Branch…",
+        "Create an empty GitButler virtual branch (but branch new)",
+        AllIcons.General.Add,
+    ) {
+        override fun getActionUpdateThread() = ActionUpdateThread.EDT
+
+        override fun update(e: AnActionEvent) {
+            e.presentation.isEnabled =
+                !operationInFlight && GitButlerService.getInstance(project).isGitButlerWorkspace()
+        }
+
+        override fun actionPerformed(e: AnActionEvent) {
+            val name = GitButlerNewBranchPrompt.ask(
+                project,
+                "New Virtual Branch",
+                "Name for the new virtual branch:",
+            ) ?: return
+            runOperation("Creating $name", "Created virtual branch $name") {
+                GitButlerService.getInstance(project).newBranch(name)
+            }
+        }
+    }
+
     private inner class UnapplyBranchAction : AnAction() {
         override fun getActionUpdateThread() = ActionUpdateThread.EDT
 
@@ -429,17 +520,25 @@ class GitButlerStatusPanel(private val project: Project) : SimpleToolWindowPanel
         }
     }
 
-    private inner class PushBranchAction : AnAction(AllIcons.Vcs.Push) {
+    private inner class PushBranchAction(private val hideWhenUnavailable: Boolean) :
+        AnAction(AllIcons.Vcs.Push) {
         override fun getActionUpdateThread() = ActionUpdateThread.EDT
 
         override fun update(e: AnActionEvent) {
             // setText(_, false): branch names carry underscores/ampersands — keep them literal, no mnemonics.
             e.presentation.setText("Push Branch", false)
-            e.presentation.isEnabledAndVisible = selectedBranch() != null && !operationInFlight
+            val branch = targetBranch()
+            e.presentation.description = if (branch != null) {
+                "Push \"${branch.name}\" (but push)"
+            } else {
+                "Select a branch (or a row under one) to push it"
+            }
+            e.presentation.isEnabled = branch != null && !operationInFlight
+            e.presentation.isVisible = !hideWhenUnavailable || branch != null
         }
 
         override fun actionPerformed(e: AnActionEvent) {
-            val name = selectedBranch()?.name ?: return
+            val name = targetBranch()?.name ?: return
             runOperation("Pushing $name", "Pushed $name") {
                 GitButlerService.getInstance(project).push(name)
             }

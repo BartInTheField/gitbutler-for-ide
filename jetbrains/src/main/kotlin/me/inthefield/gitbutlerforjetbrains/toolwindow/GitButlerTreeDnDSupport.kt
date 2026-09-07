@@ -4,12 +4,8 @@ import com.intellij.ide.util.PropertiesComponent
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.vcs.LocalFilePath
-import com.intellij.openapi.vcs.changes.ChangeListManager
 import com.intellij.openapi.ui.DoNotAskOption
 import com.intellij.openapi.ui.MessageDialogBuilder
-import com.intellij.openapi.wm.ToolWindowManager
-import me.inthefield.gitbutlerforjetbrains.commit.GitButlerCommitSelection
 import me.inthefield.gitbutlerforjetbrains.core.ButResult
 import me.inthefield.gitbutlerforjetbrains.core.ButCommits
 import me.inthefield.gitbutlerforjetbrains.core.GitButlerService
@@ -39,12 +35,13 @@ sealed interface DnDRow {
  * Drag source: a selection is draggable only if every row in it is a [DnDRow.Change]; the
  * dragged payload is the list of repo-relative paths.
  *
- * Drop target: dropping onto a [DnDRow.Branch] preselects that branch in
- * [GitButlerCommitSelection] and opens the IDE commit UI so the user finishes the commit
- * through the default flow. Dropping onto a [DnDRow.Commit] amends the dragged files into it,
- * after a confirmation the user can permanently suppress. The amend runs through the panel's
- * `runOperation` so it shares the single in-flight gate, notifications, and tree refresh with
- * every other GitButler mutation.
+ * Drop target: dropping onto a [DnDRow.Branch] hands the branch and the dragged paths to
+ * [GitButlerCommitLauncher], which preselects the branch and opens the IDE commit UI with
+ * exactly those files checked, so the user finishes the commit through the default flow.
+ * Dropping onto a [DnDRow.Commit] amends the dragged files into it, after a confirmation the
+ * user can permanently suppress. The amend runs through the panel's `runOperation` so it
+ * shares the single in-flight gate, notifications, and tree refresh with every other
+ * GitButler mutation.
  */
 object GitButlerTreeDnD {
 
@@ -92,7 +89,7 @@ object GitButlerTreeDnD {
 
                 return when (target) {
                     is DnDRow.Branch -> {
-                        dropOnBranch(project, target, paths)
+                        GitButlerCommitLauncher.openCommitFor(project, target.name, paths)
                         true
                     }
 
@@ -143,34 +140,6 @@ object GitButlerTreeDnD {
         } catch (e: Exception) {
             LOG.warn("Failed to read dragged change paths", e)
             null
-        }
-    }
-
-    private fun dropOnBranch(project: Project, branch: DnDRow.Branch, relativePaths: List<String>) {
-        GitButlerCommitSelection.getInstance(project).selectedBranch = branch.name
-        val toolWindows = ToolWindowManager.getInstance(project)
-        val commitWindow = toolWindows.getToolWindow("Commit") ?: toolWindows.getToolWindow("Version Control")
-        // Set the inclusion after the tool window is up: the non-modal commit handler may not
-        // exist before the Commit tool window has been created for the first time.
-        commitWindow?.activate { includeOnlyDraggedFiles(project, relativePaths) }
-    }
-
-    /**
-     * Replaces the Commit tool window's checked state with exactly the dragged files: tracked
-     * changes are included as [com.intellij.openapi.vcs.changes.Change]s, untracked ones as
-     * [com.intellij.openapi.vcs.FilePath]s (the shape the non-modal commit UI's unversioned
-     * nodes use). Best effort — when the non-modal handler is unavailable (e.g. commit dialog
-     * mode) the window still opens with the branch preselected.
-     */
-    private fun includeOnlyDraggedFiles(project: Project, relativePaths: List<String>) {
-        val root = GitButlerService.getInstance(project).workspaceRepository()?.root?.path ?: return
-        val changeListManager = ChangeListManager.getInstance(project)
-        val items: List<Any> = relativePaths.map { rel ->
-            val filePath = LocalFilePath("$root/$rel", false)
-            changeListManager.getChange(filePath) ?: filePath
-        }
-        if (!CommitInclusion.setInclusion(project, changeListManager.defaultChangeList, items)) {
-            LOG.warn("Non-modal commit workflow handler unavailable; dragged files not auto-included")
         }
     }
 
