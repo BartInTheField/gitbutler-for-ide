@@ -8,9 +8,28 @@ this file. On release, the Unreleased section becomes the release body.
 
 ### Features
 
+- The GitButler tool window's toolbar now carries **New Virtual Branch…**, **Commit to Branch**
+  and **Push Branch** next to Refresh and Pull Workspace, so those actions are discoverable
+  instead of right-click-only. They stay visible and gray out when the selection doesn't fit.
+- **Commit to Branch** (toolbar and branch context menu) preselects the branch in the commit
+  toolbar's GitButler combo and opens the Commit tool window, checking exactly the selected
+  change rows. Commit and Push act on the branch the selection belongs to, so they also work
+  from a commit, a file inside a commit, or an assigned change.
+- **New Virtual Branch…** creates an empty virtual branch (`but branch new`) from the tool
+  window — a lane to drag changes onto or commit to.
+- The commit toolbar's branch combo gained a **New branch…** item: name a branch that doesn't
+  exist yet and `but commit -b <name>` creates it with the commit. Removes the documented
+  "no way to create a new virtual branch from the commit window" limitation.
+
 ### Fixes
 
 ### Internal improvements
+
+- The commit-window handoff (preselect branch, open Commit tool window, replace the checked
+  inclusion) moved out of the drag-and-drop support into `GitButlerCommitLauncher`, shared by
+  the drop-onto-branch gesture and the new Commit to Branch action. The tree-selection rules
+  behind the branch-scoped actions moved to `GitButlerTreeSelection` so they are unit-tested
+  without a Swing fixture.
 
 ## 2026.8.9.1 - 2026-08-09
 

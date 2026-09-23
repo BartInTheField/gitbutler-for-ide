@@ -76,7 +76,7 @@ cd vscode && npm run build
 - 🌳 **GitButler tool window** — live `but status` tree with VCS-colored file rows, commits expandable into their changed files, and diff-on-double-click
 - ✂️ **History edits from the tree** — right-click a commit for Rename, Uncommit or Show in Git Log; right-click a file inside a commit for Uncommit File
 - 🖱️ **Drag and drop** — drag uncommitted changes onto a branch to preselect it in the commit UI, or onto a commit to amend them into it
-- 🧰 **Workspace actions in-IDE** — Pull Workspace (`but pull`) from the toolbar; Unapply Branch and Push Branch from the branch context menu
+- 🧰 **Workspace actions in-IDE** — Pull Workspace, New Virtual Branch, Commit to Branch and Push Branch on the tool-window toolbar, Unapply Branch in the branch context menu, and new virtual branches from either the toolbar or the commit window — see [the tool window docs](docs/tool-window.md)
 - 🌿 **GitButler submenu in the Git branch menu** — Apply / Unapply a branch right from the IDE's native branch context menu (remote-only branches can be applied too)
 - 🔄 **Auto-refreshing** — the tool window re-renders on git repository changes (500 ms debounced) and via a manual Refresh button
 - 🔔 **Clear notifications** — committed / committed & pushed / push failed / commit failed; a failed commit never loses your message
@@ -105,6 +105,7 @@ All GitButler operations go through the `but` CLI with `--json`, orchestrated by
 | Commit exactly the selected changes | `but commit -b <branch> -m <message> --json <change-ids>` |
 | Push (via *Commit and Push*, or tool-window context menu) | `but push <branch> --json` |
 | Pull Workspace toolbar button | `but pull --json` |
+| New Virtual Branch toolbar button | `but branch new <name> --json` |
 | Unapply Branch context menu | `but unapply <branch> --json` |
 | GitButler submenu in the Git branch menu | `but apply <branch> --json` / `but unapply <branch> --json` |
 | Rename Commit context menu | `but reword <commit> -m <message> --json` |

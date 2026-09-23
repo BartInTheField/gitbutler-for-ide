@@ -115,6 +115,11 @@ class GitButlerService(private val project: Project) : ButEnvironment {
         return runBlocking { client.unapply(branchName) }
     }
 
+    fun newBranch(name: String): ButResult<Unit> {
+        assertBackgroundThread()
+        return runBlocking { client.newBranch(name) }
+    }
+
     fun commit(branchName: String, message: String, filePaths: List<String>): ButResult<String> {
         assertBackgroundThread()
         return runBlocking { client.commit(branchName, message, filePaths) }

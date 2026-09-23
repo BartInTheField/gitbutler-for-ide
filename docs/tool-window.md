@@ -35,13 +35,28 @@ File rows are colored using the IDE's VCS `FileStatus` palette by change type, t
 |---|---|
 | **Refresh** | Re-runs `but status` and repaints the tree. |
 | **Pull Workspace** | Runs `but pull` in the background — fetches the remote and rebases every applied branch onto the updated target. Success and error results land in the "GitButler" notification group. Disabled outside a `gitbutler/workspace` checkout, and while another operation is running. |
+| **New Virtual Branch…** | Prompts for a name, then runs `but branch new <name>` to add an empty virtual branch to the workspace — a lane to drag changes onto or commit to. The name is validated as you type against git's ref-name rules, so an invalid one is refused in the dialog rather than by the CLI afterward. |
+| **Commit to Branch** | Preselects the target branch in the Commit tool window's GitButler combo and opens that window, so **Commit** routes through `but commit -b <branch>`. If the tree selection is uncommitted-change rows, exactly those files are checked for you. |
+| **Push Branch** | `but push <branch>` — pushes just the target branch. |
+
+![The GitButler tool-window toolbar — Refresh, Pull Workspace, New Virtual Branch, Commit to Branch, Push Branch — with a branch row selected](images/tool-window-toolbar.png)
+
+**Commit to Branch** and **Push Branch** act on the branch the tree selection belongs to: the selected branch row, or the branch enclosing the selected row (a commit, a file inside a commit, an assigned change). With nothing branch-related selected they stay visible but grayed out, and the tooltip says so.
+
+The **New Virtual Branch…** prompt validates as you type, so `but branch new` is never called with a name git would reject:
+
+![The New Virtual Branch prompt rejecting "bad name" with "Branch name must not contain whitespace" and a disabled OK button](images/new-virtual-branch-dialog.png)
 
 ## Context-menu actions (right-click a branch row)
 
 | Action | What it runs |
 |---|---|
-| **Unapply Branch** | `but unapply <branch>` — stash-like: takes the branch out of the workspace without losing its work. Reversible. |
+| **Commit to Branch** | Same as the toolbar action above. |
 | **Push Branch** | `but push <branch>` — pushes just that branch. |
+| **Unapply Branch** | `but unapply <branch>` — stash-like: takes the branch out of the workspace without losing its work. Reversible. |
+| **New Virtual Branch…** | Same as the toolbar action above; available from any row. |
+
+Unapply is the one branch action that requires the branch **row** itself to be selected — it takes work out of the workspace, so the target is never inferred from a nested row.
 
 All actions run as background tasks, surface a success or error balloon in the "GitButler" notification group, and refresh the tree when they finish. Actions are disabled while another GitButler operation is in flight so they can never overlap.
 
@@ -75,3 +90,18 @@ Only selections made entirely of uncommitted change rows can be dragged. Valid d
 The panel subscribes to `GitRepository.GIT_REPO_CHANGE`, so the tree re-renders itself whenever the working tree, branches, or commits change. Bursts are debounced through a 500 ms merging queue to keep repaints cheap. The subscription is scoped to the tool window content, so it dies with the panel.
 
 You can also hit **Refresh** in the toolbar at any time.
+
+## CLI commands used
+
+| Action | Command |
+|---|---|
+| Refresh / every load | `but status -f --json` |
+| Pull Workspace | `but pull --json` |
+| New Virtual Branch… | `but branch new <name> --json` |
+| Push Branch | `but push <branch> --json` |
+| Unapply Branch | `but unapply <branch> --json` |
+| Rename Commit | `but reword <commit> -m <message> --json` |
+| Uncommit / Uncommit File | `but uncommit <id> --json` |
+| Drop onto a commit (amend) | `but amend -t <commit> --json <change-ids>` |
+
+**Commit to Branch** runs no command itself — it hands off to the Commit tool window, which commits through `but commit -b <branch>` (see [Virtual-branch commit](virtual-branch-commit.md)).

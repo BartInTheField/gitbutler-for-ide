@@ -31,6 +31,15 @@ class ButClient(
 
     suspend fun unapply(branchName: String): ButResult<Unit> = simpleMutation(ButCommands.unapply(branchName))
 
+    /**
+     * Creates an empty, unstacked virtual branch. The name is validated locally first
+     * ([ButBranch.newBranchNameError]) so a name git would reject never reaches the CLI.
+     */
+    suspend fun newBranch(name: String): ButResult<Unit> {
+        ButBranch.newBranchNameError(name)?.let { return ButResult.Err(it) }
+        return simpleMutation(ButCommands.branchNew(name))
+    }
+
     suspend fun commit(branchName: String, message: String, filePaths: List<String>): ButResult<String> {
         if (filePaths.isEmpty()) return ButResult.Err("No files selected to commit")
 

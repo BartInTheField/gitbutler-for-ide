@@ -31,6 +31,11 @@ class ButCommandsTest {
     }
 
     @Test
+    fun branchNew_buildsNameArgs() {
+        assertEquals(listOf("branch", "new", "feature-a", "--json"), ButCommands.branchNew("feature-a"))
+    }
+
+    @Test
     fun commit_passesCliIdsPositionally() {
         assertEquals(
             listOf("commit", "-b", "feature-a", "-m", "add hello", "--json", "aa", "bb"),
