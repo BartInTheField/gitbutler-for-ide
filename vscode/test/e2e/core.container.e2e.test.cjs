@@ -73,3 +73,24 @@ test('core commits a real change onto a virtual branch (in container)', { skip, 
   const branchNames = parsed.status.branches.map((b) => b.name);
   assert.ok(branchNames.includes('feature-e2e'), `expected feature-e2e in ${JSON.stringify(branchNames)}`);
 });
+
+test('core creates an empty virtual branch (in container)', { skip, timeout: 600_000 }, async () => {
+  const out = await exec('node /runner.cjs /work newBranch');
+  const env = JSON.parse(out.trim().split('\n').pop());
+  assert.strictEqual(env.ok, true, `newBranch should succeed: ${env.error || ''}`);
+
+  const statusOut = await exec('node /runner.cjs /work status');
+  const parsed = JSON.parse(statusOut.trim().split('\n').pop());
+  const branch = parsed.status.branches.find((b) => b.name === 'feature-empty');
+  assert.ok(branch, `expected feature-empty in ${JSON.stringify(parsed.status.branches.map((b) => b.name))}`);
+  // Empty collections are omitted from the envelope (encodeDefaults=false), same as the
+  // extension's own `(x || [])` reads.
+  assert.strictEqual((branch.commits || []).length, 0, 'a brand new branch has no commits');
+});
+
+test('core rejects an invalid branch name before reaching the CLI (in container)', { skip, timeout: 600_000 }, async () => {
+  const out = await exec('node /runner.cjs /work badBranchName');
+  const env = JSON.parse(out.trim().split('\n').pop());
+  assert.strictEqual(env.ok, false, 'a name with whitespace must be rejected');
+  assert.match(env.error, /whitespace/i, `unexpected message: ${env.error}`);
+});

@@ -75,6 +75,21 @@ async function main(): Promise<void> {
     const shot = path.join(shotDir, 'gitbutler-view-codium.png');
     await win.screenshot({ path: shot });
 
+    // The view's title bar is the extension's toolbar: assert every action we contribute is
+    // actually surfaced there (VS Code uses each command's title as the action's aria-label).
+    const toolbarActions = await Promise.all(
+      (await win.locator('.part.sidebar .pane-header .actions-container a.action-label').all()).map(a =>
+        a.getAttribute('aria-label'),
+      ),
+    );
+    console.log('toolbar actions:', JSON.stringify(toolbarActions));
+    for (const expected of ['Refresh', 'Pull Workspace', 'New Virtual Branch', 'Commit to virtual branch', 'Push Branch']) {
+      assert.ok(
+        toolbarActions.includes(expected),
+        `expected a '${expected}' action in the view title bar; found ${JSON.stringify(toolbarActions)}`,
+      );
+    }
+
     const sidebarText = (await win.locator('.part.sidebar').innerText().catch(() => '')).replace(/\s+/g, ' ').trim();
     console.log('sidebar text:', sidebarText.slice(0, 200));
     console.log('product:', await app.evaluate(async ({ app: a }) => a.getName()));

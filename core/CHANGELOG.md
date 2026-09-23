@@ -13,6 +13,8 @@ this file. On release, the Unreleased section becomes the release body.
 - `ButBranch.newBranchNameError` validates a user-typed branch name against git's ref-name
   rules, so hosts can reject an invalid name inline instead of spawning `but` to learn it is
   invalid. `ButClient.newBranch` applies it before running the CLI.
+- `GitButlerCore.newBranch` exposes the same operation to the JS host (VSCode extension),
+  keeping the facade a complete mirror of the client.
 
 ### Fixes
 

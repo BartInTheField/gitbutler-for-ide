@@ -9,7 +9,23 @@ release body.
 
 ### Features
 
+- **New Virtual Branch** (`gitbutler.newBranch`) creates an empty virtual branch
+  (`but branch new`) from the workspace view's title bar — a lane to drag changes onto or
+  commit to. The name is validated as you type against git's ref-name rules, so an invalid
+  one is refused in the input box instead of coming back as a CLI error.
+- **Commit to Branch** (`gitbutler.commitToBranch`) commits to the branch of the row it was
+  invoked on, with no branch prompt: it quick-picks files (everything pre-selected) and asks
+  only for a message. Available inline on branch rows.
+- **Push Branch** is now in the view's title bar as well as inline on branch rows, and
+  targets the selected branch row before falling back to a quick-pick.
+- Every branch quick-pick — the commit prompts and the Source Control **Select Virtual
+  Branch for Commits** picker — gained a **New branch…** entry: name a branch that does not
+  exist yet and `but commit -b <name>` creates it with the commit.
+
 ### Fixes
+
+- **Unapply Branch** now has an icon, so its inline action on a branch row renders as an
+  icon instead of a text label that crowded the branch name.
 
 ### Internal improvements
 

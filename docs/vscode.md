@@ -28,14 +28,52 @@ Mirrors `but status`:
 |---|---|---|
 | Refresh | `gitbutler.refresh` | Re-reads `but status` and repaints the tree |
 | Pull Workspace | `gitbutler.pull` | `but pull` |
-| Push Branch | `gitbutler.push` | `but push <branch>` (from a branch row or a quick-pick) |
+| New Virtual Branch | `gitbutler.newBranch` | `but branch new <name>` — adds an empty virtual branch to the workspace |
+| Push Branch | `gitbutler.push` | `but push <branch>` (the selected branch row, else a quick-pick) |
+| Commit to Branch | `gitbutler.commitToBranch` | `but commit -b <branch>` to the branch the row belongs to — no branch prompt |
 | Apply Branch | `gitbutler.apply` | `but apply <branch>` (branch name via input box) |
 | Unapply Branch | `gitbutler.unapply` | `but unapply <branch>` |
 | Commit to virtual branch | `gitbutler.commit` | `but commit -b <branch> -m <message> <ids>` (quick-pick branch + files, input message) |
 | Commit Selected Changes | `gitbutler.commitSelected` | Commits the files currently selected in the tree (`but commit`); prompts for branch + message |
+| Rename Commit | `gitbutler.reword` | `but reword <commit> -m <message>` |
+| Uncommit / Uncommit File | `gitbutler.uncommit` / `gitbutler.uncommitFile` | `but uncommit <id>` |
+| Select Virtual Branch for Commits | `gitbutler.selectVirtualBranch` | Routes Source Control commits to a virtual branch (status-bar item) |
+| Commit to Virtual Branch | `gitbutler.commitToVirtualBranch` | Commits the Source Control input + staged files through `but commit` |
+
+### Where the actions live
+
+The view's **title bar** is the toolbar: **Refresh**, **Pull Workspace**, **New Virtual
+Branch**, **Commit to virtual branch**, **Push Branch**. Hovering a **branch row** reveals
+inline **Commit to Branch**, **Push Branch** and **Unapply Branch** icons.
+
+![The GitButler view: title-bar actions and a branch row's inline Commit to Branch, Push and Unapply icons](images/vscode-tool-view-actions.png)
+
+**Commit to Branch** deliberately does *not* ask which branch — it targets the row it was
+invoked on (branch and commit rows both carry their branch), then quick-picks files with
+everything pre-selected and asks only for a message. **Push Branch** in the title bar targets
+the selected branch row, falling back to a quick-pick when nothing branch-related is selected.
 
 The tree is multi-select: Ctrl/Shift-click (or Cmd-click) several file rows, then right-click
 the selection and choose **Commit Selected Changes** to commit exactly those files.
+
+### Creating a virtual branch
+
+Two routes, mirroring the JetBrains plugin:
+
+| Where | Command | When the branch is created |
+|---|---|---|
+| View title bar → **New Virtual Branch** | `but branch new <name>` | immediately — an empty lane to drag changes onto |
+| Any branch quick-pick → **$(add) New branch…** | `but commit -b <name>` | with the commit, so cancelling creates nothing |
+
+The second appears in every branch picker: the commit prompts and the Source Control
+**Select Virtual Branch for Commits** picker. A name typed there is only remembered — the
+branch appears once you commit.
+
+Both routes validate the name as you type against git's ref-name rules
+(`ButBranch.newBranchNameError` in `:core`, the same check the JetBrains plugin uses), so a
+name `but` would reject is refused in the input box instead of coming back as a CLI error:
+
+![The New Virtual Branch input box rejecting "bad name" with "Branch name must not contain whitespace"](images/vscode-new-branch-prompt.png)
 
 ### Drag and drop
 
@@ -69,8 +107,10 @@ cd vscode && npm run build                             # install + typecheck + b
 
 ## Known limitations
 
-- No commit-window / SCM-provider integration yet — committing is driven from the command
-  palette / view, not the native Source Control panel.
+- Virtual branches with identical names across stacks are ambiguous — the CLI is invoked by
+  branch name.
+- New branches are always created unstacked; there is no way to stack one above or below an
+  existing branch from the extension (`but branch new --above/--below` would be the hook).
 
 ## Testing
 
