@@ -9,6 +9,14 @@ release body.
 
 ### Features
 
+### Fixes
+
+### Internal improvements
+
+## 2026.9.23.2 - 2026-09-23
+
+### Features
+
 - **New Virtual Branch** (`gitbutler.newBranch`) creates an empty virtual branch
   (`but branch new`) from the workspace view's title bar — a lane to drag changes onto or
   commit to. The name is validated as you type against git's ref-name rules, so an invalid

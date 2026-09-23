@@ -8,6 +8,14 @@ this file. On release, the Unreleased section becomes the release body.
 
 ### Features
 
+### Fixes
+
+### Internal improvements
+
+## 2026.9.23.1 / 2026.9.23.2 - 2026-09-23
+
+### Features
+
 - `ButCommands.branchNew` / `ButClient.newBranch` — `but branch new <name>`, for creating an
   empty virtual branch from a host.
 - `ButBranch.newBranchNameError` validates a user-typed branch name against git's ref-name

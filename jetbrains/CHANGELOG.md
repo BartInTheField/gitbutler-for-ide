@@ -8,6 +8,14 @@ this file. On release, the Unreleased section becomes the release body.
 
 ### Features
 
+### Fixes
+
+### Internal improvements
+
+## 2026.9.23.1 - 2026-09-23
+
+### Features
+
 - The GitButler tool window's toolbar now carries **New Virtual Branch…**, **Commit to Branch**
   and **Push Branch** next to Refresh and Pull Workspace, so those actions are discoverable
   instead of right-click-only. They stay visible and gray out when the selection doesn't fit.
