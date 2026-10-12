@@ -8,6 +8,16 @@ this file. On release, the Unreleased section becomes the release body.
 
 ### Features
 
+- A plain Git repository with `but` on PATH gets a dismissible notification,
+  "This repository isn't managed by GitButler yet — Set up GitButler", with
+  **Don't ask again** remembered per project. **Git → GitButler → Set Up GitButler
+  for This Project** runs `but setup`. After it succeeds the tool window follows the
+  new `gitbutler/workspace` checkout without an IDE restart.
+- The tool window's empty state links to the same setup action.
+- **Leave GitButler Mode…** in the tool-window overflow menu explains `but teardown`,
+  lets you pick `--checkout-to` (prefilled from the applied branches), then returns the
+  project to a normal Git branch.
+
 ### Fixes
 
 ### Internal improvements

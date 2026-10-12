@@ -1,7 +1,7 @@
 {
   "name": "gitbutler-for-ide",
   "displayName": "GitButler for IDE",
-  "description": "Work with GitButler virtual branches without leaving your editor: a workspace tree view plus pull, push, apply, unapply, new-branch and commit-to-virtual-branch commands, powered by the GitButler `but` CLI.",
+  "description": "Work with GitButler virtual branches without leaving your editor: set up a repository or leave GitButler mode, plus a workspace tree and pull, push, apply, unapply, new-branch and commit commands, powered by the GitButler `but` CLI.",
   "publisher": "BartInTheField",
   "version": "0.1.0",
   "license": "MIT",
@@ -75,6 +75,18 @@
         "title": "Refresh",
         "category": "GitButler",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "gitbutler.setup",
+        "title": "Set Up This Repository",
+        "category": "GitButler",
+        "icon": "$(git-branch)"
+      },
+      {
+        "command": "gitbutler.leaveMode",
+        "title": "Leave GitButler Mode…",
+        "category": "GitButler",
+        "icon": "$(sign-out)"
       },
       {
         "command": "gitbutler.pull",

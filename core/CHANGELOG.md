@@ -8,6 +8,16 @@ this file. On release, the Unreleased section becomes the release body.
 
 ### Features
 
+- `ButCommands.setup` / `ButClient.setup` run `but setup --json`. CLI 0.22.3 prints
+  `{repositoryPath, projectStatus, target}`; exit 0 is success even if that JSON is missing.
+- `ButCommands.teardown` / `ButClient.teardown` run `but teardown --json`, adding
+  `--checkout-to <branch>` when a branch is given. The JSON result is `{snapshotId, checkedOutBranch}`.
+- `ButTeardown.checkoutCandidates` lists the local branches a host may offer for
+  `--checkout-to` (applied branches first). `hasCheckoutDefault` is false when bare
+  `but teardown` would fail because no branch is applied.
+- `GitButlerCore.setup`, `teardown`, `isGitRepository`, `checkoutCandidates` and
+  `hasCheckoutDefault` expose the same operations to the JS host.
+
 ### Fixes
 
 ### Internal improvements

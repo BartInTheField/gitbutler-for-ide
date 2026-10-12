@@ -46,6 +46,38 @@ data class WorkspaceStatus(
     val stacks: List<ButStack> = emptyList(),
 )
 
+/**
+ * `but setup --json` on CLI 0.22.3. [projectStatus] is the serde lowercase enum
+ * (`added` or `alreadyexists`). [target] is absent when the CLI did not report one.
+ */
+@Serializable
+@OptIn(ExperimentalJsExport::class)
+@JsExport
+data class ButSetupResult(
+    val repositoryPath: String = "",
+    val projectStatus: String = "",
+    val target: ButSetupTarget? = null,
+)
+
+/** Target branch recorded by `but setup --json` (`branchName` is like `origin/main` or `gb-local/main`). */
+@Serializable
+@OptIn(ExperimentalJsExport::class)
+@JsExport
+data class ButSetupTarget(
+    val branchName: String = "",
+    val remoteName: String = "",
+    val newlySet: Boolean = false,
+)
+
+/** `but teardown --json` on CLI 0.22.3: the oplog snapshot and the branch that was checked out. */
+@Serializable
+@OptIn(ExperimentalJsExport::class)
+@JsExport
+data class ButTeardownResult(
+    val snapshotId: String = "",
+    val checkedOutBranch: String = "",
+)
+
 sealed class ButResult<out T> {
     data class Ok<T>(val value: T) : ButResult<T>()
     data class Err(val message: String) : ButResult<Nothing>()

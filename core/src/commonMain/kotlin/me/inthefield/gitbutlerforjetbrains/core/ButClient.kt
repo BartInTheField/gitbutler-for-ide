@@ -75,6 +75,38 @@ class ButClient(
         return simpleMutation(ButCommands.reword(commitId, message))
     }
 
+    /**
+     * Registers the current Git repo with GitButler (`but setup --json`) and checks out
+     * `gitbutler/workspace`. Exit 0 is success: the JSON is enrichment, so an unparseable
+     * stdout still returns Ok (same rule as [commit]). A non-zero exit surfaces stderr.
+     */
+    suspend fun setup(): ButResult<ButSetupResult> {
+        val output = exec(ButCommands.setup()) { return it }
+        if (output.exitCode != 0) return errFrom(output)
+        return try {
+            ButJsonParser.parseSetupResult(output.stdout)
+        } catch (e: Exception) {
+            logWarn("`but setup` exited 0 but output was unparseable: ${e.message}. Raw output: ${output.stdout}")
+            ButResult.Ok(ButSetupResult())
+        }
+    }
+
+    /**
+     * Leaves GitButler mode (`but teardown --json`). [checkoutTo] blank or null omits
+     * `--checkout-to`. Exit 0 is success even when stdout is not the JSON shape; a non-zero
+     * exit surfaces stderr (on 0.22.3, bare teardown with no applied branch does that).
+     */
+    suspend fun teardown(checkoutTo: String? = null): ButResult<ButTeardownResult> {
+        val output = exec(ButCommands.teardown(checkoutTo?.takeIf { it.isNotBlank() })) { return it }
+        if (output.exitCode != 0) return errFrom(output)
+        return try {
+            ButJsonParser.parseTeardownResult(output.stdout)
+        } catch (e: Exception) {
+            logWarn("`but teardown` exited 0 but output was unparseable: ${e.message}. Raw output: ${output.stdout}")
+            ButResult.Ok(ButTeardownResult(checkedOutBranch = checkoutTo?.trim().orEmpty()))
+        }
+    }
+
     // --- shared plumbing -------------------------------------------------------------
 
     private suspend inline fun exec(args: List<String>, timeoutMs: Int = PROCESS_TIMEOUT_MS, onErr: (ButResult.Err) -> Nothing): ProcessResult {

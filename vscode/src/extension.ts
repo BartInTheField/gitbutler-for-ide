@@ -47,6 +47,26 @@ export interface CoreEnvelope<T> {
     error?: string;
 }
 
+export interface SetupTarget {
+    branchName?: string;
+    remoteName?: string;
+    newlySet?: boolean;
+}
+
+export interface SetupResult {
+    repositoryPath?: string;
+    projectStatus?: string;
+    target?: SetupTarget | null;
+}
+
+export interface TeardownResult {
+    snapshotId?: string;
+    checkedOutBranch?: string;
+}
+
+/** Set once the one-time setup toast has been shown for this workspace. Cleared after teardown. */
+const SETUP_PROMPTED_KEY = 'gitbutler.setupPrompted';
+
 export function callCore<T>(jsonStr: string): T {
     let envelope: CoreEnvelope<T>;
     try {
@@ -200,13 +220,7 @@ export class GitButlerTreeDataProvider implements vscode.TreeDataProvider<GitBut
         }
 
         if (!isWorkspace) {
-            return [
-                new GitButlerNode(
-                    "Not a GitButler workspace",
-                    vscode.TreeItemCollapsibleState.None,
-                    "info"
-                )
-            ];
+            return notWorkspaceNodes(this.core);
         }
 
         try {
@@ -490,6 +504,7 @@ interface GitApiChange {
 interface GitApiRepository {
     inputBox: { value: string };
     state: { indexChanges: GitApiChange[]; workingTreeChanges: GitApiChange[] };
+    getBranches?(query: { remote: boolean }): Promise<Array<{ name?: string }>>;
 }
 
 interface GitApi {
@@ -500,19 +515,82 @@ interface GitExtensionApi {
     getAPI(version: number): GitApi;
 }
 
+function notWorkspaceNodes(core: InstanceType<typeof GitButlerCore>): GitButlerNode[] {
+    const nodes = [
+        new GitButlerNode(
+            "Not a GitButler workspace",
+            vscode.TreeItemCollapsibleState.None,
+            "info"
+        ),
+    ];
+    try {
+        if (core.isGitRepository() && core.findExecutable()) {
+            const setup = new GitButlerNode(
+                "Set up GitButler",
+                vscode.TreeItemCollapsibleState.None,
+                "info"
+            );
+            setup.command = {
+                command: 'gitbutler.setup',
+                title: 'Set Up This Repository',
+            };
+            nodes.push(setup);
+        }
+    } catch {
+        // Detection is best-effort; the palette command remains.
+    }
+    return nodes;
+}
+
+async function localBranchNames(): Promise<string[]> {
+    try {
+        const gitExtension = vscode.extensions.getExtension<GitExtensionApi>('vscode.git');
+        if (gitExtension && !gitExtension.isActive) {
+            await gitExtension.activate();
+        }
+        const repository = gitExtension?.exports?.getAPI(1)?.repositories?.[0];
+        if (!repository?.getBranches) {
+            return [];
+        }
+        const branches = await repository.getBranches({ remote: false });
+        return branches.map(branch => branch.name).filter((name): name is string => !!name);
+    } catch {
+        return [];
+    }
+}
+
+async function maybePromptSetup(
+    context: vscode.ExtensionContext,
+    provider: GitButlerTreeDataProvider,
+): Promise<void> {
+    const core = provider.getCore();
+    if (!core) {
+        return;
+    }
+    if (context.workspaceState.get<boolean>(SETUP_PROMPTED_KEY, false)) {
+        return;
+    }
+    let eligible = false;
+    try {
+        eligible = !!core.findExecutable() && core.isGitRepository() && !core.isGitButlerWorkspace();
+    } catch {
+        eligible = false;
+    }
+    if (!eligible) {
+        return;
+    }
+    await context.workspaceState.update(SETUP_PROMPTED_KEY, true);
+    const choice = await vscode.window.showInformationMessage(
+        "This repository isn't managed by GitButler yet — Set up GitButler",
+        "Set up GitButler",
+    );
+    if (choice === "Set up GitButler") {
+        await vscode.commands.executeCommand('gitbutler.setup');
+    }
+}
+
 export function activate(context: vscode.ExtensionContext) {
     const treeDataProvider = new GitButlerTreeDataProvider();
-
-    const core = treeDataProvider.getCore();
-    if (core) {
-        try {
-            if (!core.isGitButlerWorkspace()) {
-                vscode.window.showInformationMessage("Current workspace is not a GitButler workspace.");
-            }
-        } catch {
-            // Guard core call
-        }
-    }
 
     context.subscriptions.push(
         vscode.workspace.onDidChangeWorkspaceFolders(() => {
@@ -534,6 +612,106 @@ export function activate(context: vscode.ExtensionContext) {
             } catch (err: unknown) {
                 const errorDetail = err instanceof Error ? err.message : String(err);
                 vscode.window.showErrorMessage(`Refresh failed: ${errorDetail}`);
+            }
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('gitbutler.setup', async () => {
+            try {
+                const currentCore = treeDataProvider.getCore();
+                if (!currentCore) {
+                    vscode.window.showErrorMessage("Open a folder to set up GitButler");
+                    return;
+                }
+                if (!currentCore.isGitRepository()) {
+                    vscode.window.showErrorMessage("This folder is not a Git repository. GitButler setup from the IDE does not create one.");
+                    return;
+                }
+                const result = callCore<SetupResult>(await currentCore.setup());
+                const target = result?.target?.branchName;
+                vscode.window.showInformationMessage(
+                    target
+                        ? `GitButler: This repository is set up (target ${target}). You're on gitbutler/workspace.`
+                        : "GitButler: This repository is set up. You're on gitbutler/workspace.",
+                );
+                treeDataProvider.refresh();
+            } catch {
+                // Surfaced by callCore
+            }
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('gitbutler.leaveMode', async () => {
+            try {
+                const currentCore = treeDataProvider.getCore();
+                if (!currentCore) {
+                    vscode.window.showErrorMessage("GitButler core not initialized");
+                    return;
+                }
+                if (!currentCore.isGitButlerWorkspace()) {
+                    vscode.window.showInformationMessage("This repository is not in GitButler mode.");
+                    return;
+                }
+                const confirmed = await vscode.window.showWarningMessage(
+                    "Leave GitButler mode? This runs but teardown and changes the checked-out branch. GitButler snapshots the workspace, checks out a normal Git branch, and cherry-picks commits made directly on gitbutler/workspace. You can set the repository up again later.",
+                    { modal: true },
+                    "Leave GitButler Mode",
+                );
+                if (confirmed !== "Leave GitButler Mode") {
+                    return;
+                }
+                const status = callCore<WorkspaceStatus>(await currentCore.statusJson());
+                const applied = (status.branches || []).map(branch => branch.name);
+                const candidates = currentCore.checkoutCandidates(applied, await localBranchNames());
+                const allowDefault = currentCore.hasCheckoutDefault(applied);
+                let checkoutTo = "";
+                if (candidates.length > 0 || allowDefault) {
+                    const items: Array<vscode.QuickPickItem & { checkoutTo: string }> = [
+                        ...(allowDefault
+                            ? [{ label: "First applied branch", description: "let but teardown choose", checkoutTo: "" }]
+                            : []),
+                        ...candidates.map(name => ({
+                            label: name,
+                            description: "but teardown --checkout-to",
+                            checkoutTo: name,
+                        })),
+                    ];
+                    const picked = await vscode.window.showQuickPick(items, {
+                        title: "Leave GitButler Mode",
+                        placeHolder: "Branch to check out",
+                    });
+                    if (!picked) {
+                        return;
+                    }
+                    checkoutTo = picked.checkoutTo;
+                } else {
+                    const typed = await vscode.window.showInputBox({
+                        title: "Leave GitButler Mode",
+                        prompt: "Local branch to check out. GitButler needs one when no branch is applied.",
+                        placeHolder: "main",
+                    });
+                    if (typed === undefined) {
+                        return;
+                    }
+                    checkoutTo = typed.trim();
+                    if (!checkoutTo) {
+                        vscode.window.showErrorMessage("Choose a local branch to check out. GitButler needs one when no branch is applied.");
+                        return;
+                    }
+                }
+                const result = callCore<TeardownResult>(await currentCore.teardown(checkoutTo));
+                const branch = result?.checkedOutBranch || checkoutTo;
+                vscode.window.showInformationMessage(
+                    branch
+                        ? `GitButler: Left GitButler mode. Checked out ${branch}.`
+                        : "GitButler: Left GitButler mode.",
+                );
+                await context.workspaceState.update(SETUP_PROMPTED_KEY, false);
+                treeDataProvider.refresh();
+            } catch {
+                // Surfaced by callCore
             }
         })
     );
@@ -1040,6 +1218,8 @@ export function activate(context: vscode.ExtensionContext) {
             }
         })
     );
+
+    void maybePromptSetup(context, treeDataProvider);
 }
 
 export function deactivate() {}

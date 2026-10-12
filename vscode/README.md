@@ -8,7 +8,7 @@ Work with [GitButler](https://gitbutler.com) virtual branches without leaving yo
 ## Requirements
 
 - [GitButler `but` CLI](https://docs.gitbutler.com/cli-overview) 0.22.0+ on your `PATH`.
-- A project set up with GitButler (`but setup`), checked out on `gitbutler/workspace`.
+- A Git repository. Set it up from the Command Palette (**GitButler: Set Up This Repository**), or with `but setup`. See [setup and teardown](https://github.com/BartInTheField/gitbutler-for-ide/blob/main/docs/setup-and-teardown.md).
 
 ## Features
 
@@ -19,8 +19,8 @@ A **GitButler** view container on the activity bar hosts a workspace tree that m
 - **Branches** — one node per applied virtual branch, each expandable into its commits.
 - **Commits** — expandable into the files they changed.
 
-When the open folder isn't on `gitbutler/workspace`, the tree shows a single
-**"Not a GitButler workspace"** row.
+When the open folder isn't on `gitbutler/workspace`, the tree shows
+**"Not a GitButler workspace"**. On a plain Git repository it also offers **Set up GitButler**.
 
 Refresh, Pull Workspace, New Virtual Branch, Commit and Push sit in the view's title bar;
 hovering a branch row reveals inline Commit to Branch, Push and Unapply icons. Every branch
@@ -39,6 +39,8 @@ the commit — see [the VSCode docs](https://github.com/BartInTheField/gitbutler
 | Apply Branch | `gitbutler.apply` | `but apply <branch>` |
 | Unapply Branch | `gitbutler.unapply` | `but unapply <branch>` |
 | Commit to virtual branch | `gitbutler.commit` | `but commit -b <branch> -m <message> <ids>` |
+| Set Up This Repository | `gitbutler.setup` | `but setup` |
+| Leave GitButler Mode… | `gitbutler.leaveMode` | `but teardown` (optional `--checkout-to`) |
 
 Failures surface as VS Code error toasts carrying the CLI's message; the tree refreshes
 after every successful mutation. All `but` calls run asynchronously, so they never freeze

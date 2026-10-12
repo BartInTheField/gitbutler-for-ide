@@ -6,7 +6,7 @@ A dedicated **GitButler** tool window that mirrors `but status` inside the IDE �
 
 The tool window is registered on the **left stripe, secondary group** — the bottom-left corner, alongside the Git tool window. It has its own 13×13 icon with a matching dark variant.
 
-If your project isn't checked out on `gitbutler/workspace`, the tree stays empty and shows **"Not a GitButler workspace"**.
+If your project isn't checked out on `gitbutler/workspace`, the tree stays empty and shows **"Not a GitButler workspace"**. On a plain Git repository a **Set up GitButler** link runs `but setup` — see [Set up GitButler, and leave GitButler mode](setup-and-teardown.md).
 
 ## The tree
 
@@ -38,6 +38,7 @@ File rows are colored using the IDE's VCS `FileStatus` palette by change type, t
 | **New Virtual Branch…** | Prompts for a name, then runs `but branch new <name>` to add an empty virtual branch to the workspace — a lane to drag changes onto or commit to. The name is validated as you type against git's ref-name rules, so an invalid one is refused in the dialog rather than by the CLI afterward. |
 | **Commit to Branch** | Preselects the target branch in the Commit tool window's GitButler combo and opens that window, so **Commit** routes through `but commit -b <branch>`. If the tree selection is uncommitted-change rows, exactly those files are checked for you. |
 | **Push Branch** | `but push <branch>` — pushes just the target branch. |
+| **⋯ → Leave GitButler Mode…** | Confirms, then runs `but teardown` (optional `--checkout-to`). The tree returns to **Not a GitButler workspace**. See [Set up and leave](setup-and-teardown.md). |
 
 ![The GitButler tool-window toolbar — Refresh, Pull Workspace, New Virtual Branch, Commit to Branch, Push Branch — with a branch row selected](images/tool-window-toolbar.png)
 

@@ -9,6 +9,14 @@ release body.
 
 ### Features
 
+- On a Git repository that is not a GitButler workspace, a one-time message offers
+  **Set up GitButler**. **GitButler: Set Up This Repository** (`gitbutler.setup`) runs
+  `but setup`; the workspace tree also shows a **Set up GitButler** row. The view and
+  Source Control routing pick up `gitbutler/workspace` without reloading the window.
+- **GitButler: Leave GitButler Mode…** (`gitbutler.leaveMode`) confirms, lets you pick
+  the branch `but teardown --checkout-to` should check out (prefilled from the applied
+  branches), then drops the repository back to plain Git.
+
 ### Fixes
 
 ### Internal improvements

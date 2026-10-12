@@ -315,6 +315,74 @@ class ButJsonParserTest {
     }
 
     @Test
+    fun parseSetupResult_addedWithTarget() {
+        // but 0.22.3 serde: camelCase fields, projectStatus lowercase enum ("added" / "alreadyexists").
+        val json = """
+            {
+              "repositoryPath": "/work/repo",
+              "projectStatus": "added",
+              "target": {"branchName": "gb-local/main", "remoteName": "gb-local", "newlySet": true}
+            }
+        """.trimIndent()
+
+        val result = ButJsonParser.parseSetupResult(json)
+
+        assertTrue(result is ButResult.Ok)
+        val value = (result as ButResult.Ok).value
+        assertEquals("/work/repo", value.repositoryPath)
+        assertEquals("added", value.projectStatus)
+        assertEquals("gb-local/main", value.target?.branchName)
+        assertEquals("gb-local", value.target?.remoteName)
+        assertEquals(true, value.target?.newlySet)
+    }
+
+    @Test
+    fun parseSetupResult_alreadyExists_withoutTarget() {
+        val json = """{"repositoryPath": "/work/repo", "projectStatus": "alreadyexists", "target": null}"""
+
+        val result = ButJsonParser.parseSetupResult(json)
+
+        assertTrue(result is ButResult.Ok)
+        val value = (result as ButResult.Ok).value
+        assertEquals("alreadyexists", value.projectStatus)
+        assertEquals(null, value.target)
+    }
+
+    @Test
+    fun parseSetupResult_errorJson_returnsErr() {
+        val json = """{"error": "not_a_repo", "message": "No git repository found"}"""
+
+        val result = ButJsonParser.parseSetupResult(json)
+
+        assertTrue(result is ButResult.Err)
+        assertEquals("No git repository found", (result as ButResult.Err).message)
+    }
+
+    @Test
+    fun parseTeardownResult_readsSnapshotAndBranch() {
+        val json = """{"snapshotId": "abc123", "checkedOutBranch": "main"}"""
+
+        val result = ButJsonParser.parseTeardownResult(json)
+
+        assertTrue(result is ButResult.Ok)
+        val value = (result as ButResult.Ok).value
+        assertEquals("abc123", value.snapshotId)
+        assertEquals("main", value.checkedOutBranch)
+    }
+
+    @Test
+    fun parseTeardownResult_errorJson_returnsErr() {
+        val json = """
+            {"error": "no_target", "message": "Failed to determine checkout target branch. Specify a target branch with `--checkout-to <branch>`."}
+        """.trimIndent()
+
+        val result = ButJsonParser.parseTeardownResult(json)
+
+        assertTrue(result is ButResult.Err)
+        assertTrue((result as ButResult.Err).message.contains("Failed to determine checkout target branch"))
+    }
+
+    @Test
     fun parseStatus_malformedJson_throws() {
         // parseStatus propagates the underlying kotlinx.serialization exception; the client wraps it in Err.
         assertFailsWith<Exception> {
