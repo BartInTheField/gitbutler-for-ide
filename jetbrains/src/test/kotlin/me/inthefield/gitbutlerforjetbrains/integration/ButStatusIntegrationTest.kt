@@ -469,6 +469,65 @@ class ButStatusIntegrationTest {
         )
     }
 
+    /**
+     * A plain `git init` repo is not a GitButler workspace. `but setup` (the command the
+     * IDE action sends) checks out `gitbutler/workspace` and `but status -f --json` parses.
+     * Teardown then returns to the branch that was current before setup.
+     *
+     * `--checkout-to` is required here: on CLI 0.22.3 a clean branch level with the target
+     * is not adopted as a stack, and bare `but teardown` exits 1 with
+     * "Failed to determine checkout target branch".
+     */
+    @Test
+    fun setupOnPlainGitRepo_thenTeardown_roundTripsTheBranch() {
+        val dir = "/work/plain-setup"
+        exec("/", "rm -rf '$dir' && mkdir -p '$dir'")
+        exec(dir, "git init")
+        exec(dir, "git commit --allow-empty -m initial")
+        val before = exec(dir, "git rev-parse --abbrev-ref HEAD").trim()
+        assertEquals("main", before)
+
+        val setupJson = but(dir, ButCommands.setup())
+        val setup = ButJsonParser.parseSetupResult(setupJson)
+        assertTrue("parseSetupResult must be Ok, raw: $setupJson", setup is ButResult.Ok)
+        val setupValue = (setup as ButResult.Ok).value
+        assertTrue("repositoryPath should be set: $setupJson", setupValue.repositoryPath.isNotEmpty())
+        assertTrue(
+            "projectStatus should be the 0.22.3 lowercase enum, was '${setupValue.projectStatus}'",
+            setupValue.projectStatus == "added" || setupValue.projectStatus == "alreadyexists",
+        )
+        assertEquals("gitbutler/workspace", exec(dir, "git rev-parse --abbrev-ref HEAD").trim())
+
+        val parsedStatus = status(dir)
+        assertNotNull(parsedStatus)
+
+        val teardownJson = but(dir, ButCommands.teardown(before))
+        val teardown = ButJsonParser.parseTeardownResult(teardownJson)
+        assertTrue("parseTeardownResult must be Ok, raw: $teardownJson", teardown is ButResult.Ok)
+        assertEquals(before, (teardown as ButResult.Ok).value.checkedOutBranch)
+        assertTrue(
+            "snapshotId should be set: $teardownJson",
+            teardown.value.snapshotId.isNotEmpty(),
+        )
+        assertEquals(before, exec(dir, "git rev-parse --abbrev-ref HEAD").trim())
+    }
+
+    /**
+     * When a branch is applied, bare `but teardown` (no `--checkout-to`) checks out that
+     * branch. Pins the argument list the leave dialog sends for "First applied branch".
+     */
+    @Test
+    fun teardown_withoutCheckoutTo_checksOutFirstAppliedBranch() {
+        val repo = freshRepo("teardown-applied")
+        but(repo, ButCommands.branchNew("feature-leave"))
+
+        val teardownJson = but(repo, ButCommands.teardown(null))
+        val teardown = ButJsonParser.parseTeardownResult(teardownJson)
+        assertTrue("parseTeardownResult must be Ok, raw: $teardownJson", teardown is ButResult.Ok)
+        assertEquals("feature-leave", (teardown as ButResult.Ok).value.checkedOutBranch)
+        assertEquals("feature-leave", exec(repo, "git rev-parse --abbrev-ref HEAD").trim())
+    }
+
     @Test
     fun pull_onFreshWorkspace_succeedsAndReportsUpToDate() {
         val repo = freshRepo("pull")

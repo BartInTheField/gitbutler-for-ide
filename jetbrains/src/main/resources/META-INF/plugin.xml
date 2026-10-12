@@ -9,6 +9,8 @@
         files each commit changed, with diff navigation, pull, push, unapply, rename/uncommit and drag-and-drop amend built in.
         New virtual branches can be created from the tool window or named straight from the commit window.
         The native Git branch menu gains a GitButler submenu to apply or unapply a branch.
+        Set up a plain Git repository for GitButler from the IDE, or leave GitButler mode, without a terminal
+        (<a href="https://github.com/BartInTheField/gitbutler-for-ide/blob/main/docs/setup-and-teardown.md">setup guide</a>).
         <br/><br/>
         This is an <b>unofficial</b> plugin and is not affiliated with or endorsed by GitButler.
         The GitButler mark is used under its CC0-1.0 brand assets (github.com/gitbutlerapp/gitbutler-brand-assets).
@@ -20,6 +22,8 @@
     <extensions defaultExtensionNs="com.intellij">
         <checkinHandlerFactory implementation="me.inthefield.gitbutlerforjetbrains.commit.GitButlerCheckinHandlerFactory"/>
         <notificationGroup id="GitButler" displayType="BALLOON"/>
+        <notificationGroup id="GitButler.Setup" displayType="STICKY_BALLOON" isLogByDefault="true"/>
+        <postStartupActivity implementation="me.inthefield.gitbutlerforjetbrains.setup.GitButlerSetupActivity"/>
         <toolWindow id="GitButler" anchor="left" secondary="true" icon="/icons/gitbutlerToolWindow.svg" factoryClass="me.inthefield.gitbutlerforjetbrains.toolwindow.GitButlerToolWindowFactory"/>
     </extensions>
 
@@ -44,6 +48,17 @@
                     text="Unapply"
                     description="Remove this branch from the GitButler workspace (but unapply)"/>
             <add-to-group group-id="Git.Branch" anchor="last"/>
+        </group>
+        <group id="GitButler.ProjectMenu"
+               class="me.inthefield.gitbutlerforjetbrains.setup.GitButlerProjectMenuGroup"
+               text="GitButler"
+               description="Set this repository up for GitButler"
+               popup="true">
+            <action id="GitButler.SetupProject"
+                    class="me.inthefield.gitbutlerforjetbrains.setup.GitButlerSetupAction"
+                    text="Set Up GitButler for This Project"
+                    description="Register this Git repository with GitButler (but setup)"/>
+            <add-to-group group-id="Git.MainMenu" anchor="last"/>
         </group>
     </actions>
 </idea-plugin>

@@ -69,7 +69,7 @@ cd vscode && npm run build
 
 ## ✨ Features (JetBrains Plugin)
 
-- 🔍 **Zero-config detection** — activates only on a `gitbutler/workspace` branch; stays completely dormant otherwise
+- 🔍 **Set up from the IDE** — on a plain Git repo, a prompt and **Git → GitButler → Set Up GitButler for This Project** run `but setup`; **Leave GitButler Mode…** runs `but teardown`. See [setup and teardown](docs/setup-and-teardown.md)
 - 🎯 **Inline branch selector** — always-visible virtual-branch combo in the commit toolbar, beside the Amend toggle
 - ✅ **Commits exactly what you check** — selected files are mapped to GitButler change IDs via `but status`
 - 🚀 **Commit and Push…** — also pushes the virtual branch (`but push`)
@@ -91,7 +91,7 @@ cd vscode && npm run build
 | **JetBrains IDE** | IntelliJ IDEA 2025.1+ (Community or Ultimate) |
 | **VSCode** | VSCode 1.85+ |
 | **CLI** | [GitButler `but`](https://docs.gitbutler.com/cli-overview) 0.22.0+ on your `PATH` (on Windows resolved via PATHEXT, e.g. `but.exe`/`but.cmd`; also auto-detected in `~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin`) |
-| **Project** | Set up with GitButler (`but setup`) |
+| **Project** | A Git repository. Set it up from the IDE, or with `but setup` — see [setup and teardown](docs/setup-and-teardown.md) |
 
 ---
 
@@ -110,6 +110,8 @@ All GitButler operations go through the `but` CLI with `--json`, orchestrated by
 | GitButler submenu in the Git branch menu | `but apply <branch> --json` / `but unapply <branch> --json` |
 | Rename Commit context menu | `but reword <commit> -m <message> --json` |
 | Uncommit / Uncommit File context menu | `but uncommit <commit-or-file-in-commit id> --json` |
+| Set up this repository | `but setup --json` |
+| Leave GitButler mode | `but teardown --json` or `but teardown --checkout-to <branch> --json` |
 | Amend by dropping changes onto a commit | `but amend -t <commit> --json <change-ids>` |
 
 ---
@@ -120,6 +122,7 @@ All GitButler operations go through the `but` CLI with `--json`, orchestrated by
 - [Virtual-branch commit](docs/virtual-branch-commit.md) — the commit-window integration
 - [GitButler tool window](docs/tool-window.md) — the workspace tree, toolbar, context menus and drag-and-drop
 - [Git branch menu](docs/git-branch-menu.md) — the GitButler Apply/Unapply submenu in the native branch context menu
+- [Set up and leave GitButler mode](docs/setup-and-teardown.md) — `but setup` / `but teardown` from the IDE
 
 **VSCode extension**
 - [GitButler for VSCode](docs/vscode.md) — the workspace tree view and commands, and how the extension consumes the shared `:core` package

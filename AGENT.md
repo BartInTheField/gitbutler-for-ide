@@ -100,6 +100,7 @@ Any change to `ButCommands`, `ButJsonParser`, `ButPathMapper`, or a new `but` su
 - Detect Commit-and-Push via `executor.id == "Git.Commit.And.Push.Executor"` — the class `git4idea.checkin.GitCommitAndPushExecutor` is Kotlin-`internal`, don't reference it.
 - The `CheckinHandlerFactory` must always return the real handler (never a dummy): it runs once at commit-UI creation, possibly before git repos register.
 - Branch names in `Presentation.setText` need `setText(text, false)` — `_`/`&` are otherwise eaten as mnemonics.
+- `but setup` and `but teardown` honour `--json` on CLI 0.22.3 (`{repositoryPath, projectStatus, target}` and `{snapshotId, checkedOutBranch}`). Bare `but teardown` exits 1 with "Failed to determine checkout target branch" when no branch is applied; pass `--checkout-to`. Do not pass `but setup --init` from the IDE.
 
 ---
 

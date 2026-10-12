@@ -37,6 +37,7 @@ import com.intellij.ui.treeStructure.Tree
 import com.intellij.vcs.log.impl.HashImpl
 import com.intellij.vcs.log.impl.VcsLogNavigationUtil
 import me.inthefield.gitbutlerforjetbrains.commit.GitButlerNewBranchPrompt
+import me.inthefield.gitbutlerforjetbrains.setup.GitButlerWorkspaceOps
 import me.inthefield.gitbutlerforjetbrains.core.ButResult
 import me.inthefield.gitbutlerforjetbrains.core.ButStack
 import me.inthefield.gitbutlerforjetbrains.core.GitButlerService
@@ -48,6 +49,7 @@ import me.inthefield.gitbutlerforjetbrains.core.WorkspaceStatus
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.ui.SimpleToolWindowPanel
 import me.inthefield.gitbutlerforjetbrains.core.ButBranch
+import java.awt.event.ActionListener
 import java.awt.event.KeyEvent
 import java.awt.event.MouseEvent
 import javax.swing.JComponent
@@ -190,6 +192,11 @@ class GitButlerStatusPanel(private val project: Project) : SimpleToolWindowPanel
             add(NewBranchAction())
             add(CommitToBranchAction(hideWhenUnavailable = false))
             add(PushBranchAction(hideWhenUnavailable = false))
+            addSeparator()
+            add(DefaultActionGroup("More", listOf(LeaveModeAction())).apply {
+                templatePresentation.icon = AllIcons.Actions.More
+                isPopup = true
+            })
         }
         val actionToolbar = ActionManager.getInstance()
             .createActionToolbar("GitButlerToolWindow", group, true)
@@ -344,7 +351,7 @@ class GitButlerStatusPanel(private val project: Project) : SimpleToolWindowPanel
             return
         }
         if (!GitButlerService.getInstance(project).isGitButlerWorkspace()) {
-            showEmpty("Not a GitButler workspace")
+            showNotWorkspace()
             return
         }
 
@@ -366,7 +373,27 @@ class GitButlerStatusPanel(private val project: Project) : SimpleToolWindowPanel
     private fun showEmpty(message: String) {
         rootNode.removeAllChildren()
         treeModel.reload()
-        tree.emptyText.text = message
+        tree.emptyText.clear()
+        tree.emptyText.appendText(message)
+    }
+
+    /**
+     * Plain Git repo: the tree stays empty, with a link that runs `but setup` when the
+     * project has a repository. A folder that is not a Git repo keeps the text only
+     * (`but setup --init` is out of scope).
+     */
+    private fun showNotWorkspace() {
+        rootNode.removeAllChildren()
+        treeModel.reload()
+        tree.emptyText.clear()
+        tree.emptyText.appendText("Not a GitButler workspace")
+        if (GitButlerService.getInstance(project).workspaceRepository() != null) {
+            tree.emptyText.appendLine(
+                "Set up GitButler",
+                SimpleTextAttributes.LINK_PLAIN_ATTRIBUTES,
+                ActionListener { GitButlerWorkspaceOps.runSetup(project) },
+            )
+        }
     }
 
     private fun renderStatus(status: WorkspaceStatus) {
@@ -424,6 +451,33 @@ class GitButlerStatusPanel(private val project: Project) : SimpleToolWindowPanel
                 }
             }
             rootNode.add(branchNode)
+        }
+    }
+
+    /**
+     * Overflow-menu action. Confirms, optionally picks `--checkout-to` from the applied
+     * branches, then runs `but teardown`. The plugin drops back to the empty state once
+     * Git reports the branch change.
+     */
+    private inner class LeaveModeAction : AnAction(
+        "Leave GitButler Mode…",
+        "Return this repository to a normal Git branch (but teardown)",
+        AllIcons.Actions.Rollback,
+    ) {
+        override fun getActionUpdateThread() = ActionUpdateThread.EDT
+
+        override fun update(e: AnActionEvent) {
+            e.presentation.isEnabled =
+                !operationInFlight && GitButlerService.getInstance(project).isGitButlerWorkspace()
+        }
+
+        override fun actionPerformed(e: AnActionEvent) {
+            if (operationInFlight) return
+            operationInFlight = true
+            GitButlerWorkspaceOps.confirmAndLeave(project) { left ->
+                operationInFlight = false
+                if (left) showNotWorkspace() else refresh()
+            }
         }
     }
 

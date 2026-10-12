@@ -140,6 +140,16 @@ class GitButlerService(private val project: Project) : ButEnvironment {
         return runBlocking { client.reword(commitId, message) }
     }
 
+    fun setup(): ButResult<ButSetupResult> {
+        assertBackgroundThread()
+        return runBlocking { client.setup() }
+    }
+
+    fun teardown(checkoutTo: String?): ButResult<ButTeardownResult> {
+        assertBackgroundThread()
+        return runBlocking { client.teardown(checkoutTo) }
+    }
+
     private fun repositories(): List<GitRepository> =
         GitRepositoryManager.getInstance(project).repositories
 

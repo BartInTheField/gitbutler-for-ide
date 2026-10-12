@@ -31,6 +31,20 @@ class GitButlerCore(workspacePath: String) {
     /** True iff the resolved repo is checked out on gitbutler/workspace. Synchronous (fast git call). */
     fun isGitButlerWorkspace(): Boolean = env.currentBranch() == ButClient.WORKSPACE_BRANCH
 
+    /** True iff [workspacePath] is inside a Git work tree. Synchronous (fast git call). */
+    fun isGitRepository(): Boolean = env.repoRoot() != null
+
+    /**
+     * Branch names a leave-mode picker may pass to [teardown], applied virtual branches
+     * first. See [ButTeardown.checkoutCandidates].
+     */
+    fun checkoutCandidates(applied: Array<String>, local: Array<String>): Array<String> =
+        ButTeardown.checkoutCandidates(applied.toList(), local.toList()).toTypedArray()
+
+    /** True when bare `but teardown` has an applied branch to check out. See [ButTeardown.hasCheckoutDefault]. */
+    fun hasCheckoutDefault(applied: Array<String>): Boolean =
+        ButTeardown.hasCheckoutDefault(applied.toList())
+
     fun statusJson(): Promise<String> = GlobalScope.promise {
         when (val r = client.status()) {
             is ButResult.Ok -> okEnvelope(Json.encodeToJsonElement(r.value))
@@ -66,6 +80,25 @@ class GitButlerCore(workspacePath: String) {
 
     fun reword(commitId: String, message: String): Promise<String> =
         GlobalScope.promise { unitEnvelope(client.reword(commitId, message)) }
+
+    /** `but setup --json`. Resolves to `{ ok: true, value: ButSetupResult }` or `{ ok: false, error }`. */
+    fun setup(): Promise<String> = GlobalScope.promise {
+        when (val r = client.setup()) {
+            is ButResult.Ok -> okEnvelope(Json.encodeToJsonElement(r.value))
+            is ButResult.Err -> errEnvelope(r.message)
+        }
+    }
+
+    /**
+     * `but teardown --json`. A blank [checkoutTo] omits `--checkout-to` so the CLI checks
+     * out the first applied branch. Resolves to `{ ok: true, value: ButTeardownResult }`.
+     */
+    fun teardown(checkoutTo: String): Promise<String> = GlobalScope.promise {
+        when (val r = client.teardown(checkoutTo)) {
+            is ButResult.Ok -> okEnvelope(Json.encodeToJsonElement(r.value))
+            is ButResult.Err -> errEnvelope(r.message)
+        }
+    }
 
     /** Pure, offline helper (no process spawn): parse a `but status --json` payload and
      *  re-serialize the parsed [WorkspaceStatus] — used by tests and for reuse in tooling. */

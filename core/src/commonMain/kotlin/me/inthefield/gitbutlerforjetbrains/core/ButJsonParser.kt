@@ -15,9 +15,10 @@ import kotlin.js.JsExport
  * Pure JSON parsing for the GitButler `but` CLI output. Multiplatform (kotlinx.serialization
  * DOM), no platform APIs, so these functions are directly unit-testable on every target.
  *
- * Malformed / unexpected JSON: [parseStatus] and [parseCommitResult] let the underlying
- * kotlinx.serialization exception propagate. Callers (the client) turn that into an Err.
- * [parseErrorMessage] never throws — it falls back to the raw input.
+ * Malformed / unexpected JSON: [parseStatus], [parseCommitResult], [parseSetupResult] and
+ * [parseTeardownResult] let the underlying kotlinx.serialization exception propagate.
+ * Callers (the client) turn that into an Err for status, and treat exit code 0 as success
+ * for the mutations. [parseErrorMessage] never throws — it falls back to the raw input.
  */
 @OptIn(ExperimentalJsExport::class)
 @JsExport
@@ -86,6 +87,50 @@ object ButJsonParser {
         }
 
         return ButResult.Ok(stringOrEmpty(root, "commitId"))
+    }
+
+    /**
+     * Parses `but setup --json` (CLI 0.22.3): `{repositoryPath, projectStatus, target?}`.
+     * [ButSetupResult.projectStatus] is the lowercase serde enum (`added`, `alreadyexists`).
+     * A payload that carries `error` and no `repositoryPath` is an Err. Malformed JSON throws.
+     */
+    fun parseSetupResult(jsonText: String): ButResult<ButSetupResult> {
+        val root = json.parseToJsonElement(jsonText).jsonObject
+        if (root.containsKey("error") && optString(root, "repositoryPath") == null) {
+            return ButResult.Err(parseErrorMessage(jsonText))
+        }
+        val targetObj = root["target"] as? JsonObject
+        val target = targetObj?.let {
+            ButSetupTarget(
+                branchName = stringOrEmpty(it, "branchName"),
+                remoteName = stringOrEmpty(it, "remoteName"),
+                newlySet = optBoolean(it, "newlySet"),
+            )
+        }
+        return ButResult.Ok(
+            ButSetupResult(
+                repositoryPath = stringOrEmpty(root, "repositoryPath"),
+                projectStatus = stringOrEmpty(root, "projectStatus"),
+                target = target,
+            ),
+        )
+    }
+
+    /**
+     * Parses `but teardown --json` (CLI 0.22.3): `{snapshotId, checkedOutBranch}`.
+     * A payload that carries `error` and no `checkedOutBranch` is an Err. Malformed JSON throws.
+     */
+    fun parseTeardownResult(jsonText: String): ButResult<ButTeardownResult> {
+        val root = json.parseToJsonElement(jsonText).jsonObject
+        if (root.containsKey("error") && optString(root, "checkedOutBranch") == null) {
+            return ButResult.Err(parseErrorMessage(jsonText))
+        }
+        return ButResult.Ok(
+            ButTeardownResult(
+                snapshotId = stringOrEmpty(root, "snapshotId"),
+                checkedOutBranch = stringOrEmpty(root, "checkedOutBranch"),
+            ),
+        )
     }
 
     /** Extracts "message" (fallback "error", fallback raw) from an error JSON. Never throws. */

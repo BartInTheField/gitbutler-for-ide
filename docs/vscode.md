@@ -9,7 +9,9 @@ bundled into the extension. All GitButler operations shell out to the `but` CLI 
 
 The extension contributes a **GitButler** view container on the activity bar with a
 **gitbutlerWorkspace** tree view. When the open folder isn't checked out on
-`gitbutler/workspace`, the tree shows a single **"Not a GitButler workspace"** row.
+`gitbutler/workspace`, the tree shows **"Not a GitButler workspace"**. On a plain Git
+repository it also shows a **Set up GitButler** row — see
+[Set up GitButler, and leave GitButler mode](setup-and-teardown.md).
 
 ## The tree
 
@@ -27,6 +29,8 @@ Mirrors `but status`:
 | Command | ID | What it runs |
 |---|---|---|
 | Refresh | `gitbutler.refresh` | Re-reads `but status` and repaints the tree |
+| Set Up This Repository | `gitbutler.setup` | `but setup` — registers the Git repo and checks out `gitbutler/workspace` |
+| Leave GitButler Mode… | `gitbutler.leaveMode` | Confirms, then `but teardown` (optional `--checkout-to`) |
 | Pull Workspace | `gitbutler.pull` | `but pull` |
 | New Virtual Branch | `gitbutler.newBranch` | `but branch new <name>` — adds an empty virtual branch to the workspace |
 | Push Branch | `gitbutler.push` | `but push <branch>` (the selected branch row, else a quick-pick) |

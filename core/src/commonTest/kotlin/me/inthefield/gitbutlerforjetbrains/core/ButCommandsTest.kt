@@ -79,4 +79,24 @@ class ButCommandsTest {
             ButCommands.reword("commit-1", "new message"),
         )
     }
+
+    @Test
+    fun setup_requestsJson() {
+        assertEquals(listOf("setup", "--json"), ButCommands.setup())
+    }
+
+    @Test
+    fun teardown_withoutCheckoutTo_requestsJsonOnly() {
+        assertEquals(listOf("teardown", "--json"), ButCommands.teardown(null))
+        assertEquals(listOf("teardown", "--json"), ButCommands.teardown(""))
+        assertEquals(listOf("teardown", "--json"), ButCommands.teardown("   "))
+    }
+
+    @Test
+    fun teardown_withCheckoutTo_passesLongFlag() {
+        assertEquals(
+            listOf("teardown", "--checkout-to", "feature-a", "--json"),
+            ButCommands.teardown("feature-a"),
+        )
+    }
 }
