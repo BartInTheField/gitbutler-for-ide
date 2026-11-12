@@ -11,6 +11,8 @@ release body.
 
 ### Fixes
 
+- Opening the diff for a new file or deleted file in a commit no longer fails with "Unable to resolve nonexistent file" (#55)
+
 ### Internal improvements
 
 ## 2026.9.23.2 - 2026-09-23

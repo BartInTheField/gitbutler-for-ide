@@ -6,10 +6,13 @@ const GitButlerCore = me.inthefield.gitbutlerforjetbrains.core.GitButlerCore;
 const ButBranch = me.inthefield.gitbutlerforjetbrains.core.ButBranch;
 const ButCommits = me.inthefield.gitbutlerforjetbrains.core.ButCommits;
 
+/** The `changeType` values `but status --json` reports for a file. */
+export type ChangeType = 'added' | 'modified' | 'removed' | 'renamed';
+
 export interface Change {
     cliId: string;
     filePath: string;
-    changeType: string;
+    changeType: ChangeType;
 }
 
 export interface Commit {
@@ -170,7 +173,7 @@ export class GitButlerTreeDataProvider implements vscode.TreeDataProvider<GitBut
                 command: 'gitbutler.openDiff',
                 title: 'Open Diff',
                 arguments: commitId !== undefined
-                    ? [path.join(this.workspacePath, change.filePath), commitId]
+                    ? [path.join(this.workspacePath, change.filePath), commitId, change.changeType]
                     : [path.join(this.workspacePath, change.filePath)]
             };
         }
@@ -500,8 +503,44 @@ interface GitExtensionApi {
     getAPI(version: number): GitApi;
 }
 
+// Colors the editor tab of a file opened from a commit green (added) or red (deleted),
+// matching how VS Code's Source Control view shows new and deleted files.
+// VS Code's Git extension only decorates working-tree files, not file versions from a commit.
+class CommitFileDecorationProvider implements vscode.FileDecorationProvider {
+    private readonly decorations = new Map<string, vscode.FileDecoration>();
+    private readonly changeEmitter = new vscode.EventEmitter<vscode.Uri>();
+    readonly onDidChangeFileDecorations = this.changeEmitter.event;
+
+    markAdded(uri: vscode.Uri): void {
+        this.set(uri, new vscode.FileDecoration('A', 'Added', new vscode.ThemeColor('gitDecoration.addedResourceForeground')));
+    }
+
+    markDeleted(uri: vscode.Uri): void {
+        this.set(uri, new vscode.FileDecoration('D', 'Deleted', new vscode.ThemeColor('gitDecoration.deletedResourceForeground')));
+    }
+
+    provideFileDecoration(uri: vscode.Uri): vscode.FileDecoration | undefined {
+        return this.decorations.get(uri.toString());
+    }
+
+    dispose(): void {
+        this.changeEmitter.dispose();
+    }
+
+    private set(uri: vscode.Uri, decoration: vscode.FileDecoration): void {
+        this.decorations.set(uri.toString(), decoration);
+        this.changeEmitter.fire(uri);
+    }
+}
+
 export function activate(context: vscode.ExtensionContext) {
     const treeDataProvider = new GitButlerTreeDataProvider();
+
+    const commitFileDecorations = new CommitFileDecorationProvider();
+    context.subscriptions.push(
+        commitFileDecorations,
+        vscode.window.registerFileDecorationProvider(commitFileDecorations)
+    );
 
     const core = treeDataProvider.getCore();
     if (core) {
@@ -909,7 +948,7 @@ export function activate(context: vscode.ExtensionContext) {
         })
     );
     context.subscriptions.push(
-        vscode.commands.registerCommand('gitbutler.openDiff', async (filePath?: string, parentCommitId?: string) => {
+        vscode.commands.registerCommand('gitbutler.openDiff', async (filePath?: string, parentCommitId?: string, changeType?: ChangeType) => {
             if (!filePath) {
                 return;
             }
@@ -924,9 +963,22 @@ export function activate(context: vscode.ExtensionContext) {
             }
             const api = ext?.exports?.getAPI(1);
             if (api?.toGitUri) {
-                const left = api.toGitUri(uri, `${parentCommitId}^`);
-                const right = api.toGitUri(uri, parentCommitId);
-                await vscode.commands.executeCommand('vscode.diff', left, right, `${path.basename(filePath)} (${parentCommitId.slice(0, 7)})`);
+                const fileName = path.basename(filePath);
+                // An added file has no "before" version and a removed file has no "after" version,
+                // so open the one version that exists instead of a diff, like VS Code's Source Control view.
+                if (changeType === 'added') {
+                    const added = api.toGitUri(uri, parentCommitId);
+                    commitFileDecorations.markAdded(added);
+                    await vscode.commands.executeCommand('vscode.open', added, {}, `${fileName} (Added)`);
+                } else if (changeType === 'removed') {
+                    const deleted = api.toGitUri(uri, `${parentCommitId}^`);
+                    commitFileDecorations.markDeleted(deleted);
+                    await vscode.commands.executeCommand('vscode.open', deleted, {}, `${fileName} (Deleted)`);
+                } else {
+                    const left = api.toGitUri(uri, `${parentCommitId}^`);
+                    const right = api.toGitUri(uri, parentCommitId);
+                    await vscode.commands.executeCommand('vscode.diff', left, right, `${fileName} (${parentCommitId.slice(0, 7)})`);
+                }
             } else {
                 await vscode.commands.executeCommand('vscode.open', uri);
             }
